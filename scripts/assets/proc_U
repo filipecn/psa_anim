@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    default
+    {
+        type    slip;
+    }
+
+    top
+    {
+        type    pressureInletOutletVelocity;
+        value   uniform (0 0 0);
+    }
+
+
+    bottom
+    {
+        type 	codedFixedValue;
+        value   uniform (0 0 0);
+        name    bottomUFixedValue;
+
+        code
+#{
+    const fvPatch& boundaryPatch = patch(); 
+    // surface normal field
+    const vectorField& Nf = boundaryPatch.nf();
+    const vectorField& Cf = boundaryPatch.Cf(); 
+    vectorField& field = *this;
+    forAll(Cf, i) {
+       	const scalar x = Cf[i].x();
+	const scalar y = Cf[i].y();    
+	auto normal = (-Nf[i]).normalise();	
+	
+	field[i] = vector(0.0, 0.0, 0.0);
+    	
+    	if(x >= <<<XMIN>>> && x <= <<<XMAX>>> && y >= <<<YMIN>>> && y <= <<<YMAX>>>)
+            	field[i] = <<<VALUE>>> * normal;
+    }
+#};
+    }
+
+    inlet
+    {
+        //type            inletOutlet;
+        //value           $internalField;
+        //inletValue      uniform (0 0 0);
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+
+    outlet
+    {
+        //type            inletOutlet;
+        //value           $internalField;
+        //inletValue      uniform (0 0 0);
+        type            pressureInletOutletVelocity;
+        value           $internalField;
+    }
+
+    walls
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,37 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+Dab         <<<DAB>>>;// 2e-04; // 1e-06;
+alphatab    1;
+
+phases (snow air);
+
+snow
+{
+    transportModel  Newtonian;
+    nu              <<<SNOW_VISCOSITY>>>; // 1e-04; // 1e-06;
+    rho             <<<SNOW_DENSITY>>>;
+}
+
+air
+{
+    transportModel  Newtonian;
+    nu              1.4e-05;
+    rho             <<<AIR_DENSITY>>>;
+}
+
+// ************************************************************************* //

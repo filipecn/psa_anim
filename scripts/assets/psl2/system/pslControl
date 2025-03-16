@@ -1,0 +1,7 @@
+// terrain patch
+pslTerrainPatchName bottom;
+// profile
+pslProfileFile stats;             // store mass, maxU per frame
+// entrainment method
+pslEntrainmentMethod 0;           // entrainament method 0 or 1
+pslSnowCoverDensity 25;           // snow cover density [kg / m3]

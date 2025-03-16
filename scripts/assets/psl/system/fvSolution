@@ -1,0 +1,101 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "alpha.snow.*"
+    {
+        nAlphaSubCycles     2;
+        nAlphaCorr          1;
+
+        // solver          smoothSolver;
+        // smoother        GaussSeidel;
+        tolerance       1e-4; // 9
+        relTol          0;
+        nSweeps         1;
+
+        solver           PBiCGStab;
+        preconditioner   FDIC;
+    }
+
+    p_rgh
+    {
+        // solver          GAMG;
+        tolerance       1e-4; // 7
+        relTol          0.01;
+        // smoother        GaussSeidel;
+
+        solver           PBiCGStab;
+        preconditioner   FDIC;
+    }
+
+    p_rghFinal
+    {
+        $p_rgh;
+        relTol          0;
+    }
+
+    U
+    {
+        // solver          smoothSolver;
+        // smoother        GaussSeidel;
+        tolerance       1e-4; // 7
+        relTol          0.1;
+        nSweeps         1;
+        
+        solver           PBiCGStab;
+        preconditioner   DILU;
+        // tolerance        1e-10;
+        // relTol           0.01;
+    }
+
+    UFinal
+    {
+        $U;
+        relTol          0;
+    }
+
+    <<<SOLVERS>>>
+}
+
+PIMPLE
+{
+    momentumPredictor   yes;
+    nOuterCorrectors    1;
+    nCorrectors         1; // 2
+    nNonOrthogonalCorrectors 1; // 2
+
+    pRefValue           0;
+    pRefCell           70000;
+
+    residualControl
+    {
+        U
+        {
+            tolerance  1e-05;
+            relTol     0;
+        }
+        p_rgh
+        {
+            tolerance  1e-05;
+            relTol     0;
+        }
+    }
+}
+
+
+// ************************************************************************* //

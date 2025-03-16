@@ -1,0 +1,94 @@
+solid inlet
+  facet normal 1 0 -0
+    outer loop
+      vertex -1 -1 0
+      vertex -1 1 1
+      vertex -1 -1 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex -1 -1 0
+      vertex -1 1 0
+      vertex -1 1 1
+    endloop
+  endfacet
+endsolid
+solid outlet
+  facet normal -1 -0 0
+    outer loop
+      vertex 1 1 1
+      vertex 1 -1 0
+      vertex 1 -1 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 1 1 0
+      vertex 1 -1 0
+      vertex 1 1 1
+    endloop
+  endfacet
+endsolid
+solid terrain
+  facet normal 0 0 1
+    outer loop
+      vertex -1 -1 0
+      vertex 1 -1 0
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 -0 1
+    outer loop
+      vertex -1 -1 0
+      vertex 1 1 0
+      vertex -1 1 0
+    endloop
+  endfacet
+endsolid
+solid top
+  facet normal 0 0 -1
+    outer loop
+      vertex 1 -1 1
+      vertex -1 -1 1
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal -0 -0 -1
+    outer loop
+      vertex 1 1 1
+      vertex -1 -1 1
+      vertex -1 1 1
+    endloop
+  endfacet
+endsolid
+solid walls
+  facet normal 0 1 -0
+    outer loop
+      vertex 1 -1 1
+      vertex -1 -1 0
+      vertex -1 -1 1
+    endloop
+  endfacet
+  facet normal 0 1 -0
+    outer loop
+      vertex 1 -1 0
+      vertex -1 -1 0
+      vertex 1 -1 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -1 1 1
+      vertex 1 1 0
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex -1 1 0
+      vertex 1 1 0
+      vertex -1 1 1
+    endloop
+  endfacet
+endsolid

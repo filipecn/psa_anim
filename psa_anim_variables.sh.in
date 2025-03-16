@@ -1,0 +1,15 @@
+#!/bin/bash
+
+export PSA_ANIM_RENDER_TOOLS="@RENDER_TOOLS_PATH@"
+export PSA_ANIM_TOOLS="@TOOLS_PATH@"
+export PSA_ANIM_SCRIPTS="@SCRIPTS_PATH@"
+export PSA_ANIM_PY_PATH="@PSA_ANIM_PY_PATH@"
+export PSA_ANIM_TUTORIALS="@TUTORIALS_PATH@"
+
+echo "Exporting PSA_ANIM enviroment variables"
+echo "====================================="
+echo "PSA_ANIM_RENDER_TOOLS: $PSA_ANIM_RENDER_TOOLS"
+echo "PSA_ANIM_TOOLS:        $PSA_ANIM_TOOLS"
+echo "PSA_ANIM_SCRIPTS:      $PSA_ANIM_SCRIPTS"
+echo "PSA_ANIM_PY_PATH:       $PSA_ANIM_PY_PATH"
+echo "PSA_ANIM_TUTORIALS:    $PSA_ANIM_TUTORIALS"
