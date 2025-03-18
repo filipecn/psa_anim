@@ -2,8 +2,8 @@
 # This script runs a given tutorial
 
 if [ -z "$PSA_ANIM_SCRIPTS" ] || [ -z "$PSA_ANIM_TOOLS" ] || [ -z "$PSA_ANIM_RENDER_TOOLS" ]; then
-  echo "error: Nadare enviroment variables (PSA_ANIM_*) not set. Please run"
-  echo "       'source PATH/TO/PSA_ANIM/BUILD/nadare_variables.sh'"
+  echo "error: PSA_ANIM enviroment variables (PSA_ANIM_*) not set. Please run"
+  echo "       'source PATH/TO/PSA_ANIM/BUILD/psa_anim_variables.sh'"
   exit
 fi
 
@@ -19,7 +19,6 @@ export TOOLS_DIR=$PSA_ANIM_SCRIPTS
 export C_TOOLS_DIR=$PSA_ANIM_TOOLS
 export RENDER_TOOLS=$PSA_ANIM_RENDER_TOOLS
 export FOAM2VDB="$C_TOOLS_DIR"/foam2vdb
-export VDBSURFACE="$C_TOOLS_DIR"/vdb_surface
 # paths
 export SIM_DIR=$(pwd)
 export OUTPUT_DIR=""
@@ -28,8 +27,6 @@ export DSL_DIR="$SIM_DIR"/dsl
 export PSL_DIR=$SIM_DIR/psl
 export TERRAIN_SURFACE_DIR=$OUTPUT_DIR
 export VDB_DIR=$OUTPUT_DIR/vdb
-export SURF_DIR="$OUTPUT_DIR"/surf
-export RENDER_DIR="$OUTPUT_DIR"/render
 export DSL_SURFACE_DIR="$OUTPUT_DIR"/dsl_surf
 # logging
 export LOG_FILE="$SIM_DIR"/log.run_main
@@ -38,10 +35,8 @@ export DSL_LOG_FILE="$SIM_DIR"/log.dsl
 export RENDER_LOG_FILE="$OUTPUT_DIR"/log.render
 # options
 export ONLY_DSL=0
-export RELEASE=0
-export USE_TURBULENCE=0
 export USE_DSL_SIM=0
-export RUN_PARALLEL=0
+export RUN_PARALLEL=1
 export RENDER_SIM=1
 export ONLY_RENDER=0
 export RUN_2D=0
@@ -63,6 +58,7 @@ export write_format="ascii"
 #export boundary_condition="rev-full-wind-open"
 export boundary_condition="open"
 export entrainment_method=80
+export max_co="0.2"
 export entrainment_u_factor="1.6"
 export entrainment_a_factor="0.1"
 export entrainment_f_factor="80"
@@ -75,7 +71,57 @@ export r_type="patch"
 export t_type="patch"
 
 usage() {
-  echo "usage: tutorial [[-o output] | [-t tools-dir] | [-c c-tools-dir] | [-h]]"
+  cat <<-USAGE_TXT
+
+  Usage: tutorial [OPTION]...
+  Run a full PSA_ANIM case (DSL + PSL) workflow (simulation + vdb):
+    - run a DSL simulation
+    - convert DSL output into PSL input
+    - run the PSL simulation
+    - produce final animation assets (psl vdb and dsl surface mesh files)
+
+
+  Example: tutorial --name wolfsgrube
+
+  Default values are listed along with the argument types or at the end of the
+  of each description between brackets (ex: [float|DEFAULT VALUE]).
+
+  Required:
+          --name [NAME]                  Case name (ex: wolfsgrube).
+
+  Options:
+          --no-render                    Skip vdb generation.
+          --only-render                  No simulation, only vdb generation.
+          --only-dsl                     Skip PSL simulation.
+          --single-thread                Run sequential (default is parallel).
+          --2d                           Run 2D version (drop y axis).
+          --parallel-x [N|5]             N thread divisions in x direction.
+          --parallel-y [N|4]             N thread divisions in y direction.
+          --parallel-z [N|1]             N thread divisions in z direction.
+          --binary                       Set OpenFOAM's output files as binary.
+
+  Simulation:
+          --write-time [float|0.05]      Simulation output file time.           
+          --dt [float|0.0001]            Simulation timestep (in seconds).
+          --duration [float|50]          Simulation duration (in seconds).
+          --cell-size [float|5]          Mesh's base cell size.
+  PSL parameters:
+          --u-factor [float|1.6]
+          --a-factor [float|0.1]
+          --f-factor [float|80]
+          --snow-density [float|1.7]
+          --snow-viscosity [float|1e-04]
+          --dab [float|2e-04]
+
+
+  Paths:
+      --use-dsl-sim [PATH]               Use dsl simulation from given PATH.
+      -o, --output [PATH]                Simulation output dir.
+                                         [folder with case's name in current dir]
+      -O [PATH]                          Result dir (vdb, dsl_surf).
+                                         [simulation output dir]
+      -P, --python [PATH|python3]        Python binary path 
+USAGE_TXT
 }
 
 tutorial_name=""
@@ -98,28 +144,6 @@ while [ "$1" != "" ]; do
   -O)
     shift
     OUTPUT_DIR=$(realpath "$1")
-    ;;
-  -t | --tools-dir)
-    shift
-    TOOLS_DIR=$1
-    ;;
-  -c | --c-tools-dir)
-    shift
-    C_TOOLS_DIR=$1
-    ;;
-  --render-dir)
-    shift
-    RENDER_DIR=$1
-    ;;
-  -r | --release)
-    RELEASE=1
-    ;;
-  --use-turbulence)
-    USE_TURBULENCE=1
-    ;;
-  -m | --mesh-generator)
-    shift
-    PSL_MESH_TYPE=$1
     ;;
   --binary)
     write_format="binary"
@@ -177,12 +201,12 @@ while [ "$1" != "" ]; do
     shift
     entrainment_f_factor=$1
     ;;
-  --erosion-energy)
+  --max-co)
     shift
-    erosion_energy=$1
+    max_co=$1
     ;;
-  --run-parallel)
-    RUN_PARALLEL=1
+  --single-thread)
+    RUN_PARALLEL=0
     ;;
   --parallel-x)
     shift
@@ -195,9 +219,6 @@ while [ "$1" != "" ]; do
   --parallel-z)
     shift
     PARALLEL_Z=$1
-    ;;
-  --run-sequential)
-    RUN_PARALLEL=0
     ;;
   --no-render)
     RENDER_SIM=0
@@ -247,13 +268,10 @@ fi
 
 TERRAIN_SURFACE_DIR=$OUTPUT_DIR
 VDB_DIR=$OUTPUT_DIR/vdb
-SURF_DIR="$OUTPUT_DIR"/surf
-RENDER_DIR="$OUTPUT_DIR"/render
 DSL_SURFACE_DIR="$OUTPUT_DIR"/dsl_surf
 
 ######################################################################### tools
 FOAM2VDB="$C_TOOLS_DIR"/foam2vdb
-VDBSURFACE="$C_TOOLS_DIR"/vdb_surface
 
 ####################################################################### logging
 LOG_FILE="$SIM_DIR"/log.run_${tutorial_name}
@@ -278,16 +296,12 @@ RENDER_LOG_FILE="$OUTPUT_DIR"/log.render
   echo "  OUTPUT_DIR:           $OUTPUT_DIR"
   echo "  WORKING_DIR:          $WORKING_DIR"
   echo "  RENDER_TOOLS:         $RENDER_TOOLS"
-  echo "  VDB_SURFACE:          $VDBSURFACE"
   echo "  FOAM2VDB:             $FOAM2VDB"
   echo "================================================================="
   echo "Setting paths:"
   echo "  DSL_DIR:              $DSL_DIR"
   echo "  PSL_DIR:              $PSL_DIR"
   echo "  VDB_DIR:              $VDB_DIR"
-  echo "  RIB_DIR:              $RIB_DIR"
-  echo "  SURF_DIR:             $SURF_DIR"
-  echo "  RENDER_DIR:           $RENDER_DIR"
   echo "  TERRAIN_SURFACE_DIR:  $TERRAIN_SURFACE_DIR"
   echo "  DSL_SURFACE_DIR:      $DSL_SURFACE_DIR"
   echo "Log files:"
@@ -302,7 +316,6 @@ RENDER_LOG_FILE="$OUTPUT_DIR"/log.render
   echo "  RUN_PARALLEL:         $RUN_PARALLEL ($PARALLEL_X $PARALLEL_Y $PARALLEL_Z)"
   echo "  RENDER_SIM:           $RENDER_SIM"
   echo "  USE_DSL_SIM:          $USE_DSL_SIM"
-  echo "  USE_TURBULENCE:       $USE_TURBULENCE"
   echo "  MESH TYPE:            $PSL_MESH_TYPE"
   echo "================================================================="
   echo "Simulation Parameters:"
@@ -329,15 +342,6 @@ set_psl_dir() {
   PSL_DIR=$1
 }
 
-################################################################################
-#	VIEW FUNCTION                                                                #
-################################################################################
-view() {
-  if [ $RUN_PARAVIEW -eq 1 ]; then
-    export PATH=$PATH:/mnt/windows/Projects/paraview/ParaView-5.11.0-RC1-MPI-Linux-Python3.9-x86_64/bin
-    paraFoam -builtin
-  fi
-}
 ################################################################################
 #	NOTIFY FUNCTION                                                              #
 #   $1 - message                                                               #
@@ -414,6 +418,7 @@ setup_psl_2d() {
     --snow-viscosity "$snow_viscosity"          \
     --entrainment-method "$entrainment_method"  \
     --dab $dab                                  \
+    --max-co $max_co                            \
     --u-factor "$entrainment_u_factor"          \
     --a-factor "$entrainment_a_factor"          \
     --f-factor "$entrainment_f_factor"          \
@@ -425,46 +430,26 @@ setup_psl_2d() {
 ################################################################################
 setup_psl_3d() {
   generator=$1
-  # init openfoam project directory
-  if [ $USE_TURBULENCE -eq 1 ]; then
-    $PYTHON "$TOOLS_DIR"/init_psl.py              \
-      -o "$PSL_DIR"                               \
-      --template-dir "$TOOLS_DIR"/assets/psl      \
-      --mesh-generator $generator                 \
-      --domain-type tunnel                        \
-      --dt $delta_t                               \
-      --wt "$write_time"                          \
-      --et "$duration"                            \
-      --snow-density "$snow_density"              \
-      --entrainment-method "$entrainment_method"  \
-      --use-turbulence
-
-    fb_type="wall"
-    b_type="wall"
-    l_type="patch"
-    r_type="patch"
-    t_type="wall"
-  else
-    $PYTHON "$TOOLS_DIR"/init_psl.py                \
-      -o "$PSL_DIR"                                 \
-      --template-dir "$TOOLS_DIR"/assets/psl        \
-      --mesh-generator $generator                   \
-      --domain-type $boundary_condition             \
-      --write-format $write_format                  \
-      --snow-density "$snow_density"                \
-      --snow-viscosity "$snow_viscosity"            \
-      --entrainment-method "$entrainment_method"    \
-      --dab   $dab                                  \
-      --u-factor "$entrainment_u_factor"            \
-      --a-factor "$entrainment_a_factor"            \
-      --f-factor "$entrainment_f_factor"            \
-      --px $PARALLEL_X                              \
-      --py $PARALLEL_Y                              \
-      --pz $PARALLEL_Z                              \
-      --dt $delta_t                                 \
-      --wt "$write_time"                            \
-      --et "$duration"                        
-  fi
+  $PYTHON "$TOOLS_DIR"/init_psl.py                \
+    -o "$PSL_DIR"                                 \
+    --template-dir "$TOOLS_DIR"/assets/psl        \
+    --mesh-generator $generator                   \
+    --domain-type $boundary_condition             \
+    --write-format $write_format                  \
+    --snow-density "$snow_density"                \
+    --snow-viscosity "$snow_viscosity"            \
+    --entrainment-method "$entrainment_method"    \
+    --dab   $dab                                  \
+    --max-co $max_co                              \
+    --u-factor "$entrainment_u_factor"            \
+    --a-factor "$entrainment_a_factor"            \
+    --f-factor "$entrainment_f_factor"            \
+    --px $PARALLEL_X                              \
+    --py $PARALLEL_Y                              \
+    --pz $PARALLEL_Z                              \
+    --dt $delta_t                                 \
+    --wt "$write_time"                            \
+    --et "$duration"                        
 }
 ################################################################################
 #	PREPARE PSL DATA FUNCTION                                                    #
@@ -596,23 +581,6 @@ render_sim()
         #--use-ptu                                            \
         #-f 600
     fi
-  
-    # extract mesh from psl
-    # [ ! -d "$SURF_DIR" ] && mkdir "$SURF_DIR"
-    # $VDBSURFACE -i "$VDB_DIR" \
-    #   -o "$SURF_DIR" \
-    #   --adaptive \
-    #   --isovalue 0.01 \
-    #   --grid-name density
-  
-    # render
-    # [[ ! -d $RENDER_DIR ]] && mkdir "$RENDER_DIR"
-    # "$PSA_ANIM_RENDER_TOOLS"/render_blender_animation.sh \
-    #   -o "$RENDER_DIR" \
-    #   -b "$PSA_ANIM_RENDER_TOOLS"/ramp.blend \
-    #   --root-dir "$SIM_DIR" \
-    #   -s 15 \
-    #   -e 15
   
   } #2>&1 | tee "$RENDER_LOG_FILE"
 }

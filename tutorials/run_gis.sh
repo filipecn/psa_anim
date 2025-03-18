@@ -17,7 +17,7 @@
   echo "  DOMAIN_LENGTH:        $DOMAIN_LENGTH"
   echo "  TERRAIN_ALIGNED:      $TERRAIN_ALIGNED"
   echo "================================================================="
-} | tee "$LOG_FILE"
+} | tee -a "$LOG_FILE"
 
 # compute domain width for the PSL simulation
 # for that, lets compute the unit distance vector between point a and b of the avalanche axis
@@ -142,15 +142,14 @@ run_full() {
       [[ ! -d "$DSL_DIR"/constant/gisdata ]] && mkdir "$DSL_DIR"/constant/gisdata
 
       if [[ -f ${ASSETS_DIR}/releaseArea ]]; then
-        #cp "$ASSETS_DIR"/release.dbf "$DSL_DIR"/constant/gisdata/release.dbf
-        #cp "$ASSETS_DIR"/release.shp "$DSL_DIR"/constant/gisdata/release.shp
-        #cp "$ASSETS_DIR"/release.shx "$DSL_DIR"/constant/gisdata/release.shx
-        #
-        #cp "$ASSETS_DIR"/aoi.dbf "$DSL_DIR"/constant/gisdata/aoi.dbf
-        #cp "$ASSETS_DIR"/aoi.shp "$DSL_DIR"/constant/gisdata/aoi.shp
-        #cp "$ASSETS_DIR"/aoi.shx "$DSL_DIR"/constant/gisdata/aoi.shx
-
-        #cp "$ASSETS_DIR"/dem.asc "$DSL_DIR"/constant/gisdata/dem.asc
+        cp "$ASSETS_DIR"/release.dbf "$DSL_DIR"/constant/gisdata/release.dbf || echo ""
+        cp "$ASSETS_DIR"/release.shp "$DSL_DIR"/constant/gisdata/release.shp || echo ""
+        cp "$ASSETS_DIR"/release.shx "$DSL_DIR"/constant/gisdata/release.shx || echo ""
+        
+        cp "$ASSETS_DIR"/aoi.dbf "$DSL_DIR"/constant/gisdata/aoi.dbf || echo ""  
+        cp "$ASSETS_DIR"/aoi.shp "$DSL_DIR"/constant/gisdata/aoi.shp || echo "" 
+        cp "$ASSETS_DIR"/aoi.shx "$DSL_DIR"/constant/gisdata/aoi.shx || echo ""  
+        cp "$ASSETS_DIR"/dem.asc "$DSL_DIR"/constant/gisdata/dem.asc || echo "" 
         
         cp "$ASSETS_DIR"/releaseArea "$DSL_DIR"/constant/releaseArea
       else

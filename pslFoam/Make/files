@@ -1,0 +1,3 @@
+pslFoam.C
+
+EXE = $(FOAM_APPBIN)/pslFoam

@@ -1215,7 +1215,7 @@ private:
 
 PYBIND11_MAKE_OPAQUE(std::vector<std::string>);
 
-PYBIND11_MODULE(psa_animpy, m) {
+PYBIND11_MODULE(psa_anim_py, m) {
   py::bind_vector<std::vector<std::string>>(m, "VectorString");
   m.doc() = "OpenFoam PolyMesh & Sim files wrapper";
 

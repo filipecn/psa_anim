@@ -37,10 +37,6 @@ set(CMAKE_CONFIGURATION_TYPES Release)
 # ##############################################################################
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(OpenVDB REQUIRED)
-find_package(
-  Python 3.8
-  COMPONENTS Interpreter Development
-  REQUIRED)
 
 include(ExternalProject)
 list(APPEND CMAKE_MODULE_PATH "${PSA_ANIM_ROOT}/ext")
@@ -68,8 +64,8 @@ add_subdirectory(tools)
 # ##############################################################################
 # psa_anim_rc                                                                 ##
 # ##############################################################################
-set(PSA_ANIM_PY_PATH ${CMAKE_BINARY_DIR}/psa_anim/lib)
-set(TOOLS_PATH ${CMAKE_BINARY_DIR}/psa_anim/tools)
+set(PSA_ANIM_PY_PATH ${CMAKE_BINARY_DIR}/lib)
+set(TOOLS_PATH ${CMAKE_BINARY_DIR}/tools)
 set(SCRIPTS_PATH ${PSA_ANIM_ROOT}/scripts)
 set(TUTORIALS_PATH ${PSA_ANIM_ROOT}/tutorials)
 set(RENDER_TOOLS_PATH ${PSA_ANIM_ROOT}/render)

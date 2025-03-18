@@ -1,8 +1,8 @@
 <div align="center">
 
-# <b>PoseVocab</b>: Learning Joint-structured Pose Embeddings for Human Avatar Modeling
+# Digital Animation of Powder-Snow Avalanches
 
-<h2>SIGGRAPH 2023</h2>
+<h2>SIGGRAPH 2025</h2>
 
 [Filipe Nascimento](https://filipecn.dev/), [Fabricio Simeone](https://sites.google.com/icmc.usp.br/fssousa/home), [Afonso Paiva](https://sites.google.com/icmc.usp.br/apneto/)
 
