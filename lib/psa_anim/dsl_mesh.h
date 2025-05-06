@@ -28,6 +28,7 @@
 #ifndef PSA_ANIM_TOOLS_OPENFOAM_PARSER_FA_MESH_H
 #define PSA_ANIM_TOOLS_OPENFOAM_PARSER_FA_MESH_H
 
+#include "hermes/logging/logging.h"
 #include <boundary_mesh.h>
 #include <hermes/geometry/queries.h>
 #include <mesh_utils.h>
@@ -273,8 +274,6 @@ public:
       Ws.emplace_back(W);
     }
 
-    // HERMES_LOG_VARIABLE(boundary_vertices.size());
-
     // generate new mesh faces
     for (size_t face_index : dsl_faces) {
       auto face_vertices = faceVertexIndices(face_index);
@@ -324,13 +323,9 @@ private:
   // *******************************************************************************************************************
   //                                                                                                        FRONT SDF
   // *******************************************************************************************************************
-  /// Computes front distance field by front propagation
-  /// \param front_face_list output list of leading edge faces
-  /// \return A vector containing the distance from the front for every cell in
-  /// the patch
+
   std::vector<double>
-  computeFrontDistanceField(std::vector<FrontCell> &front_face_list) {
-    // HERMES_LOG("computing front distance field");
+  computeFrontDistanceField2(std::vector<FrontCell> &front_face_list) {
     // init face sdf distance
     std::vector<double> sdf_field_ref(poly_mesh_->patches[patch_id_].size, -1);
     // read dsl data
@@ -347,8 +342,9 @@ private:
 
     // detect faces that contain the iso-line
     // lead edge faces (faces containing the front iso-line) are faces on the
-    // very front edge of the flow, neighbouring empty cells in their velocity
-    // direction this set stores global face ids
+    // very front edge of the flow, adjacent to empty cells in their velocity
+    // direction
+    // this set stores global face ids
     std::set<size_t> candidate_front_faces;
     for (size_t local_face_id = 0;
          local_face_id < poly_mesh_->patches[patch_id_].size; ++local_face_id) {
@@ -394,13 +390,11 @@ private:
       }
     }
 
-    // HERMES_LOG_VARIABLE(candidate_front_faces.size());
-
     // candidate_front_faces potentially has too much faces
     // here we filter the candidate faces to a list of actual front faces
     std::queue<int> lead_edge_faces;
     front_face_list.clear();
-    // real front faces will be the the faces with no candidates ahead
+    // real front faces will be the faces with no candidates ahead
     for (const auto &candidate_front_face : candidate_front_faces) {
       // indices
       auto global_face_id = candidate_front_face;
@@ -448,7 +442,177 @@ private:
       }
     }
 
-    // HERMES_LOG_VARIABLE(lead_edge_faces.size());
+    // compute sdf from isoline
+    while (!lead_edge_faces.empty()) {
+      auto local_face_id = lead_edge_faces.front();
+      lead_edge_faces.pop();
+      auto global_face_id =
+          local_face_id + poly_mesh_->patches[patch_id_].start;
+      const auto face_U = dslU_surface_field[local_face_id];
+      const auto face_center = poly_mesh_->faceCenter(global_face_id);
+      // consider only neighbors on the opposite direction of the velocity
+      // direction retrieve neighbouring faces iterate over boundary neighbor
+      // faces
+      auto neighbours = globalFaceNeighbours(global_face_id);
+      for (auto neighbour : neighbours) {
+        const auto neighbour_center = poly_mesh_->faceCenter(neighbour.face_id);
+        auto edge_a = vertexAt(neighbour.edge_a).xy();
+        auto edge_b = vertexAt(neighbour.edge_b).xy();
+        hermes::Line2 edge_line(edge_a, edge_b - edge_a);
+        if (hermes::GeometricQueries::intersect(
+                edge_line, hermes::ray2(face_center.xy(), -face_U.xy()))) {
+          const auto neighbour_local_face_id =
+              neighbour.face_id - poly_mesh_->patches[patch_id_].start;
+          const auto neighbour_h = dslH_surface_field[neighbour_local_face_id];
+          // discard no dsl faces
+          if (neighbour_h < minimal_snow_height)
+            continue;
+          // push face only if it can be updated
+          auto dist = (neighbour_center - face_center).length();
+          // propagate only to greater values
+          if (sdf_field_ref[neighbour_local_face_id] >= 0 &&
+              sdf_field_ref[neighbour_local_face_id] <=
+                  sdf_field_ref[local_face_id] + dist)
+            continue;
+          // little hack due to -1 values for outside dsl faces
+          auto fixed_init_value = sdf_field_ref[neighbour_local_face_id] < 0
+                                      ? std::numeric_limits<double>::max()
+                                      : sdf_field_ref[neighbour_local_face_id];
+          if (fixed_init_value > sdf_field_ref[local_face_id] + dist) {
+            sdf_field_ref[neighbour_local_face_id] =
+                sdf_field_ref[local_face_id] + dist;
+            lead_edge_faces.push(neighbour_local_face_id);
+          }
+        }
+      }
+    }
+    // convert -1 values into max values
+    for (auto &value : sdf_field_ref)
+      if (value < 0)
+        value = hermes::Numbers::greatest_f32();
+    return sdf_field_ref;
+  }
+
+  /// Computes front distance field by front propagation
+  /// \param front_face_list output list of leading edge faces
+  /// \return A vector containing the distance from the front for every cell in
+  /// the patch
+  std::vector<double>
+  computeFrontDistanceField(std::vector<FrontCell> &front_face_list) {
+    // init face sdf distance
+    std::vector<double> sdf_field_ref(poly_mesh_->patches[patch_id_].size, -1);
+    // read dsl data
+    HERMES_ASSERT(poly_mesh_->patch(patch_name_).size);
+    HERMES_ASSERT(scalar_fields_.count("fa_h"));
+    HERMES_ASSERT(vector_fields_.count("fa_Us"));
+    const std::vector<hermes::vec3> &dslU_surface_field =
+        vector_fields_["fa_Us"];
+    std::vector<double> dslH_surface_field = scalar_fields_["fa_h"];
+    HERMES_ASSERT(poly_mesh_->patch(patch_name_).size ==
+                  dslH_surface_field.size());
+    HERMES_ASSERT(poly_mesh_->patch(patch_name_).size ==
+                  dslU_surface_field.size());
+
+    // detect faces that contain the iso-line
+    // lead edge faces (faces containing the front iso-line) are faces on the
+    // very front edge of the flow, adjacent to empty cells in their velocity
+    // direction
+    // this set stores global face ids
+    std::set<size_t> candidate_front_faces;
+    for (size_t local_face_id = 0;
+         local_face_id < poly_mesh_->patches[patch_id_].size; ++local_face_id) {
+      auto global_face_id =
+          local_face_id + poly_mesh_->patches[patch_id_].start;
+      // get face info
+      const auto face_h = dslH_surface_field[local_face_id];
+      const auto face_U = dslU_surface_field[local_face_id];
+      const auto face_center = poly_mesh_->faceCenter(global_face_id);
+
+      // filter dsl faces
+      if (face_h < minimal_snow_height || face_U.length() < minimal_velocity)
+        continue;
+      // retrieve neighbouring faces
+      auto neighbours = globalFaceNeighbours(global_face_id);
+      HERMES_ASSERT(!neighbours.empty());
+      // iterate over neighbor faces
+      for (auto neighbour : neighbours) {
+        // Method 1
+        // Consider large gradients along velocity direction DOWNWARDS
+        const auto neighbour_center = poly_mesh_->faceCenter(neighbour.face_id);
+        // check if neighbour is towards velocity direction
+
+        // here we see if this neighbour cell is ahead of the center cell
+        auto edge_a = vertexAt(neighbour.edge_a).xy();
+        auto edge_b = vertexAt(neighbour.edge_b).xy();
+        hermes::Line2 edge_line(edge_a, edge_b - edge_a);
+        if (hermes::GeometricQueries::intersect(
+                edge_line, hermes::ray2(face_center.xy(), face_U.xy()))) {
+          const auto neighbour_local_face_id =
+              neighbour.face_id - poly_mesh_->patches[patch_id_].start;
+          const auto neighbour_h = dslH_surface_field[neighbour_local_face_id];
+          // check h gradient
+          if (neighbour_h < minimal_snow_height ||
+              (face_h / neighbour_h > minimal_snow_height_ratio &&
+               face_U.length() >
+                   dslU_surface_field[neighbour_local_face_id].length())) {
+            candidate_front_faces.insert(global_face_id);
+            break;
+          }
+        }
+      }
+    }
+
+    // candidate_front_faces potentially has too much faces
+    // here we filter the candidate faces to a list of actual front faces
+    std::queue<int> lead_edge_faces;
+    front_face_list.clear();
+    // real front faces will be the faces with no candidates ahead
+    for (const auto &candidate_front_face : candidate_front_faces) {
+      // indices
+      auto global_face_id = candidate_front_face;
+      HERMES_ASSERT(global_face_id >= poly_mesh_->patches[patch_id_].start);
+      auto local_face_id =
+          global_face_id - poly_mesh_->patches[patch_id_].start;
+      // data
+      const auto face_U = dslU_surface_field[local_face_id];
+      const auto face_center = poly_mesh_->faceCenter(global_face_id);
+
+      // get neighbors along the velocity direction
+      auto neighbours = globalFaceNeighbours(global_face_id);
+      HERMES_ASSERT(!neighbours.empty());
+
+      // iterate over neighbor faces
+      bool is_leading_edge = true;
+      for (auto neighbour : neighbours) {
+        // Method 1
+        // Consider large gradients along velocity direction DOWNWARDS
+        const auto neighbour_center = poly_mesh_->faceCenter(neighbour.face_id);
+        // check if neighbour is towards velocity direction
+
+        auto edge_a = vertexAt(neighbour.edge_a).xy();
+        auto edge_b = vertexAt(neighbour.edge_b).xy();
+        hermes::Line2 edge_line(edge_a, edge_b - edge_a);
+        if (!hermes::GeometricQueries::intersect(
+                edge_line, hermes::ray2(face_center.xy(), face_U.xy())) &&
+            candidate_front_faces.find(neighbour.face_id) !=
+                candidate_front_faces.end()) {
+          is_leading_edge = false;
+          break;
+        }
+      }
+
+      is_leading_edge = true;
+      if (is_leading_edge) {
+        sdf_field_ref[local_face_id] = 0;
+        lead_edge_faces.push(local_face_id);
+        front_face_list.push_back(
+            {.cell_id = (int)local_face_id,
+             .position = poly_mesh_->faceCenter(
+                 local_face_id + poly_mesh_->patches[patch_id_].start),
+             .velocity = dslU_surface_field[local_face_id],
+             .height = static_cast<real_t>(dslH_surface_field[local_face_id])});
+      }
+    }
 
     // compute sdf from isoline
     while (!lead_edge_faces.empty()) {

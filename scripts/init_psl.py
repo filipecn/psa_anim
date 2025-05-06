@@ -40,9 +40,20 @@ foam_file_dict_template = (
     "// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //\n"
 )
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
 
 def write_control_dict_file(
-    path, delta_t, write_time, end_time, write_format, max_co, template_file
+    path, delta_t, write_time, end_time, write_format, max_co, template_file, args
 ):
     with open(template_file, "r") as f:
         file_content = f.read()
@@ -55,13 +66,13 @@ def write_control_dict_file(
         .replace("<<<MAX_CO>>>", "%.8f" % max_co)
     )
 
-    print("[init_psl] writing ...", path / "controlDict")
+    LOG("[init_psl] writing ...", path / "controlDict")
     with open(path / "controlDict", "w") as f:
         f.write(file_content)
 
 
 def write_transport_properties(
-    path, snow_density, air_density, template_file, dab, snow_viscosity
+    path, snow_density, air_density, template_file, dab, snow_viscosity, args
 ):
     with open(template_file, "r") as f:
         file_content = f.read()
@@ -72,12 +83,12 @@ def write_transport_properties(
         .replace("<<<DAB>>>", str(dab))
     )
 
-    print("[init_psl] writing ...", path / "transportProperties")
+    LOG("[init_psl] writing ...", path / "transportProperties")
     with open(path / "transportProperties", "w") as f:
         f.write(file_content)
 
 
-def write_turbulence_properties(path, use_turbulence, template_file):
+def write_turbulence_properties(path, use_turbulence, template_file, args):
     with open(template_file, "r") as f:
         file_content = f.read()
 
@@ -105,12 +116,12 @@ def write_turbulence_properties(path, use_turbulence, template_file):
             "<<<CONFIG>>>", ""
         )
 
-    print("[init_psl] writing ...", path / "turbulenceProperties")
+    LOG("[init_psl] writing ...", path / "turbulenceProperties")
     with open(path / "turbulenceProperties", "w") as f:
         f.write(file_content)
 
 
-def write_fv_schemes(path, use_turbulence, template_file):
+def write_fv_schemes(path, use_turbulence, template_file, args):
     div_schemes = {
         "div(rhoPhi,U)": "Gauss vanLeer;",  # "Gauss linear;",
         "div(phi,alpha)": "Gauss vanLeer01;",
@@ -135,12 +146,12 @@ def write_fv_schemes(path, use_turbulence, template_file):
     with open(template_file, "r") as f:
         file_content = f.read()
     file_content = file_content.replace("<<<DIV_SCHEMES>>>", s)
-    print("[init_psl] writing ...", path / "fvSchemes")
+    LOG("[init_psl] writing ...", path / "fvSchemes")
     with open(path / "fvSchemes", "w") as f:
         f.write(file_content)
 
 
-def write_fv_solution(path, use_turbulence, template_file):
+def write_fv_solution(path, use_turbulence, template_file, args):
     solvers = {}
 
     if use_turbulence:
@@ -162,19 +173,23 @@ def write_fv_solution(path, use_turbulence, template_file):
     with open(template_file, "r") as f:
         file_content = f.read()
     file_content = file_content.replace("<<<SOLVERS>>>", s)
-    print("[init_psl] writing ...", path / "fvSolution")
+    file_content = file_content.replace("<<<NCORRECTORS>>>", str(args.n_correctors))
+    file_content = file_content.replace(
+        "<<<NNOCORRECTORS>>>", str(args.n_northo_correctors)
+    )
+    LOG("[init_psl] writing ...", path / "fvSolution")
     with open(path / "fvSolution", "w") as f:
         f.write(file_content)
 
 
-def write_decompose_par_dict(path, x, y, z, template_file):
+def write_decompose_par_dict(path, x, y, z, template_file, args):
     with open(template_file, "r") as f:
         file_content = f.read()
     file_content = file_content.replace(
         "<<<NUMBER_OF_SUBDOMAINS>>>", str(x * y * z)
     ).replace("<<<SUBDOMAINS>>>", "%d %d %d" % (x, y, z))
 
-    print("[init_psl] writing ...", path / "decomposeParDict")
+    LOG("[init_psl] writing ...", path / "decomposeParDict")
     with open(path / "decomposeParDict", "w") as f:
         f.write(file_content)
 
@@ -200,12 +215,12 @@ def write_psl_control(path, args):
     file_content += "pslUEntrainmentFactor " + str(args.u_factor) + ";\n"
     file_content += "pslAEntrainmentFactor " + str(args.a_factor) + ";\n"
     file_content += "pslFrontLengthFactor " + str(args.f_factor) + ";\n"
-    print("[init_psl] writing ...", path / "pslControl")
+    LOG("[init_psl] writing ...", path / "pslControl")
     with open(path / "pslControl", "w") as f:
         f.write(file_content)
 
 
-def write_all_run(path, set_fields, mesh_generator, template_file):
+def write_all_run(path, set_fields, mesh_generator, template_file, args):
     with open(template_file, "r") as f:
         file_content = f.read()
 
@@ -215,7 +230,7 @@ def write_all_run(path, set_fields, mesh_generator, template_file):
 
     file_content = file_content.replace("<<<APPLICATIONS>>>", str(applications))
 
-    print("[init_psl] writing ...", path / os.path.basename(template_file))
+    LOG("[init_psl] writing ...", path / os.path.basename(template_file))
     with open(path / os.path.basename(template_file), "w") as f:
         f.write(file_content)
 
@@ -569,7 +584,7 @@ if __name__ == "__main__":
         help="blockMesh|pMesh|cartesianMesh|makeFaMesh|slopeMesh",
         default="blockMesh",
     )
-    parser.add_argument("--max-co", type=str, default="0.2")
+    parser.add_argument("--max-co", type=float, default="0.2")
     parser.add_argument("--dab", type=str, default="2e-04")
     parser.add_argument("--snow-viscosity", type=str, default="1e-04")
     parser.add_argument(
@@ -587,12 +602,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--f-factor", type=float, help="front length factor", default=10
     )
+    parser.add_argument(
+        "--n-correctors", type=int, help="PIMPLE -> nCorrectors", default=2
+    )
+    parser.add_argument(
+        "--n-northo-correctors",
+        type=int,
+        help="PIMPLE -> nNonOrthogonalCorrectors",
+        default=2,
+    )
     parser.add_argument("--profile", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
-
+    verbose = args.verbose
     if args.o.exists() and os.listdir(args.o):
-        print("[init_psl] output folder not empty")
-        print("[init_psl][output folder] " + str(args.o))
+        ERR("[init_psl] output folder not empty")
+        ERR("[init_psl][output folder] " + str(args.o))
         exit(1)
     elif not args.o.exists():
         os.makedirs(args.o)
@@ -625,6 +650,7 @@ if __name__ == "__main__":
         args.write_format,
         args.max_co,
         args.template_dir / "system/controlDict",
+        args,
     )
     write_transport_properties(
         constant_dir,
@@ -633,17 +659,19 @@ if __name__ == "__main__":
         args.template_dir / "constant/transportProperties",
         args.dab,
         args.snow_viscosity,
+        args,
     )
     write_turbulence_properties(
         constant_dir,
         args.use_turbulence,
         args.template_dir / "constant/turbulenceProperties",
+        args,
     )
     write_fv_schemes(
-        system_dir, args.use_turbulence, args.template_dir / "system/fvSchemes"
+        system_dir, args.use_turbulence, args.template_dir / "system/fvSchemes", args
     )
     write_fv_solution(
-        system_dir, args.use_turbulence, args.template_dir / "system/fvSolution"
+        system_dir, args.use_turbulence, args.template_dir / "system/fvSolution", args
     )
     write_decompose_par_dict(
         system_dir,
@@ -651,15 +679,17 @@ if __name__ == "__main__":
         args.py,
         args.pz,
         args.template_dir / "system/decomposeParDict",
+        args,
     )
     write_all_run(
-        args.o, args.set_fields, args.mesh_generator, args.template_dir / "Allrun"
+        args.o, args.set_fields, args.mesh_generator, args.template_dir / "Allrun", args
     )
     write_all_run(
         args.o,
         args.set_fields,
         args.mesh_generator,
         args.template_dir / "Allrun-parallel",
+        args,
     )
     write_boundary_conditions(
         args.domain_type,

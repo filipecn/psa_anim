@@ -76,8 +76,8 @@ PIMPLE
 {
     momentumPredictor   yes;
     nOuterCorrectors    1;
-    nCorrectors         1; // 2
-    nNonOrthogonalCorrectors 1; // 2
+    nCorrectors         <<<NCORRECTORS>>>; 
+    nNonOrthogonalCorrectors <<<NNOCORRECTORS>>>;
 
     pRefValue           0;
     pRefCell           70000;

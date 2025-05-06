@@ -13,6 +13,10 @@ if ! command -v blockMesh &> /dev/null; then
   exit
 fi
 
+# COMMAND
+BASE_COMMAND=$0
+BASE_ARGS=$args
+
 # tools
 export PYTHON=python3
 export TOOLS_DIR=$PSA_ANIM_SCRIPTS
@@ -29,12 +33,15 @@ export TERRAIN_SURFACE_DIR=$OUTPUT_DIR
 export VDB_DIR=$OUTPUT_DIR/vdb
 export DSL_SURFACE_DIR="$OUTPUT_DIR"/dsl_surf
 # logging
+export verbose=""
+export VERBOSE=0
 export LOG_FILE="$SIM_DIR"/log.run_main
 export PSL_LOG_FILE="$SIM_DIR"/log.psl
 export DSL_LOG_FILE="$SIM_DIR"/log.dsl
 export RENDER_LOG_FILE="$OUTPUT_DIR"/log.render
 # options
-export ONLY_DSL=0
+export RUN_DSL=1
+export RUN_PSL=1
 export USE_DSL_SIM=0
 export RUN_PARALLEL=1
 export RENDER_SIM=1
@@ -50,14 +57,16 @@ export PARALLEL_Z=1
 export duration=50
 export delta_t=0.0001
 export write_time=0.05
+export reconstruct_step=0
 export cell_size=5
 export snow_density="1.4"
 export snow_viscosity="1e-04"
 export dab="2e-04"
 export write_format="ascii"
-#export boundary_condition="rev-full-wind-open"
-export boundary_condition="open"
+export boundary_condition="rev-full-wind-open"
 export entrainment_method=80
+export n_correctors=2
+export n_northo_correctors=2
 export max_co="0.2"
 export entrainment_u_factor="1.6"
 export entrainment_a_factor="0.1"
@@ -93,12 +102,14 @@ usage() {
           --no-render                    Skip vdb generation.
           --only-render                  No simulation, only vdb generation.
           --only-dsl                     Skip PSL simulation.
+          --only-psl                     Skip DSL simulation.
           --single-thread                Run sequential (default is parallel).
           --2d                           Run 2D version (drop y axis).
           --parallel-x [N|5]             N thread divisions in x direction.
           --parallel-y [N|4]             N thread divisions in y direction.
           --parallel-z [N|1]             N thread divisions in z direction.
           --binary                       Set OpenFOAM's output files as binary.
+          --verbose                    
 
   Simulation:
           --write-time [float|0.05]      Simulation output file time.           
@@ -147,6 +158,10 @@ while [ "$1" != "" ]; do
     ;;
   --binary)
     write_format="binary"
+    ;;
+  --output-step)
+    shift
+    reconstruct_step=$1
     ;;
   --write-time)
     shift
@@ -227,10 +242,28 @@ while [ "$1" != "" ]; do
     RUN_2D=1
     ;;
   --only-dsl)
-    ONLY_DSL=1
+    RUN_PSL=0
+    ;;
+  --only-psl)
+    RUN_DSL=0
     ;;
   --only-render)
     ONLY_RENDER=1
+    ;;
+  --open-bc)
+    boundary_condition="open"
+    entrainment_u_factor="1.0"
+    entrainment_a_factor="0.4"
+    snow_density="7.0"
+    ;;
+  --optimized)
+    max_co="0.7"
+    n_correctors=1
+    n_northo_correctors=1
+    ;;
+  --verbose)
+    VERBOSE=1
+    verbose="--verbose"
     ;;
   -h | --help)
     usage
@@ -283,56 +316,67 @@ RENDER_LOG_FILE="$OUTPUT_DIR"/log.render
 [ ! -d "$SIM_DIR" ] && mkdir -p "$SIM_DIR"
 [ ! -d "$OUTPUT_DIR" ] && mkdir -p "$SIM_DIR"
 
-{
-  echo "Running Simulation Case $name"
-  echo "$0"
-  echo "$args"
-  echo "================================================================="
-  echo "Using paths:"
-  echo "  PYTHON CMD:           $PYTHON"
-  echo "  TOOLS_DIR:            $TOOLS_DIR"
-  echo "  C_TOOLS_DIR:          $C_TOOLS_DIR"
-  echo "  SIM_DIR:              $SIM_DIR"
-  echo "  OUTPUT_DIR:           $OUTPUT_DIR"
-  echo "  WORKING_DIR:          $WORKING_DIR"
-  echo "  RENDER_TOOLS:         $RENDER_TOOLS"
-  echo "  FOAM2VDB:             $FOAM2VDB"
-  echo "================================================================="
-  echo "Setting paths:"
-  echo "  DSL_DIR:              $DSL_DIR"
-  echo "  PSL_DIR:              $PSL_DIR"
-  echo "  VDB_DIR:              $VDB_DIR"
-  echo "  TERRAIN_SURFACE_DIR:  $TERRAIN_SURFACE_DIR"
-  echo "  DSL_SURFACE_DIR:      $DSL_SURFACE_DIR"
-  echo "Log files:"
-  echo "  LOG_FILE:             $LOG_FILE"
-  echo "  PSL_LOG_FILE:         $PSL_LOG_FILE"
-  echo "  DSL_LOG_FILE:         $DSL_LOG_FILE"
-  echo "  RENDER_LOG_FILE:      $RENDER_LOG_FILE"
-  echo "================================================================="
-  echo "Options:"
-  echo "  RUN_2D:               $RUN_2D"
-  echo "  ONLY_DSL:             $ONLY_DSL"
-  echo "  RUN_PARALLEL:         $RUN_PARALLEL ($PARALLEL_X $PARALLEL_Y $PARALLEL_Z)"
-  echo "  RENDER_SIM:           $RENDER_SIM"
-  echo "  USE_DSL_SIM:          $USE_DSL_SIM"
-  echo "  MESH TYPE:            $PSL_MESH_TYPE"
-  echo "================================================================="
-  echo "Simulation Parameters:"
-  echo "  DURATION:             $duration"
-  echo "  CELL_SIZE:            $cell_size"
-  echo "  WRITE_TIME:           $write_time"
-  echo "  WRITE_FORMAT:         $write_format"
-  echo "  SNOW_DENSITY:         $snow_density"
-  echo "  SNOW_VISCOSITY:       $snow_viscosity"
-  echo "  DAB:                  $dab"
-  echo "  EROSION_ENERGY:       $erosion_energy"
-  echo "  BOUNDARY_CONDITION:   $boundary_condition"
-  echo "  ENTRAINMENT_METHOD:   $entrainment_method"
-  echo "  ENTRAINMENT_U_FACTOR: $entrainment_u_factor"
-  echo "  ENTRAINMENT_A_FACTOR: $entrainment_a_factor"
-  echo "================================================================="
-} | tee "$LOG_FILE"
+
+################################################################################
+#	PARAMETERS LOG FUNCTION                                                      #
+################################################################################
+log_parameters() {
+  {
+    echo "Running Simulation Case $name"
+    echo "$0"
+    echo "$args"
+    echo "================================================================="
+    echo "Using paths:"
+    echo "  PYTHON CMD:           $PYTHON"
+    echo "  TOOLS_DIR:            $TOOLS_DIR"
+    echo "  C_TOOLS_DIR:          $C_TOOLS_DIR"
+    echo "  SIM_DIR:              $SIM_DIR"
+    echo "  OUTPUT_DIR:           $OUTPUT_DIR"
+    echo "  WORKING_DIR:          $WORKING_DIR"
+    echo "  RENDER_TOOLS:         $RENDER_TOOLS"
+    echo "  FOAM2VDB:             $FOAM2VDB"
+    echo "================================================================="
+    echo "Setting paths:"
+    echo "  DSL_DIR:              $DSL_DIR"
+    echo "  PSL_DIR:              $PSL_DIR"
+    echo "  VDB_DIR:              $VDB_DIR"
+    echo "  TERRAIN_SURFACE_DIR:  $TERRAIN_SURFACE_DIR"
+    echo "  DSL_SURFACE_DIR:      $DSL_SURFACE_DIR"
+    echo "Log files:"
+    echo "  LOG_FILE:             $LOG_FILE"
+    echo "  PSL_LOG_FILE:         $PSL_LOG_FILE"
+    echo "  DSL_LOG_FILE:         $DSL_LOG_FILE"
+    echo "  RENDER_LOG_FILE:      $RENDER_LOG_FILE"
+    echo "================================================================="
+    echo "Options:"
+    echo "  RUN_2D:               $RUN_2D"
+    echo "  RUN_DSL:              $RUN_DSL"
+    echo "  RUN_PSL:              $RUN_PSL"
+    echo "  RUN_PARALLEL:         $RUN_PARALLEL ($PARALLEL_X $PARALLEL_Y $PARALLEL_Z)"
+    echo "  RENDER_SIM:           $RENDER_SIM"
+    echo "  USE_DSL_SIM:          $USE_DSL_SIM"
+    echo "  MESH TYPE:            $PSL_MESH_TYPE"
+    echo "  WRITE_TIME:           $write_time"
+    echo "  WRITE_FORMAT:         $write_format"
+    echo "  RECONSTRUCT_STEP:     $reconstruct_step"
+    echo "================================================================="
+    echo "Simulation Parameters:"
+    echo "  DURATION:             $duration"
+    echo "  CELL_SIZE:            $cell_size"
+    echo "  SNOW_DENSITY:         $snow_density"
+    echo "  SNOW_VISCOSITY:       $snow_viscosity"
+    echo "  DAB:                  $dab"
+    echo "  MAX_CO:               $max_co"
+    echo "  EROSION_ENERGY:       $erosion_energy"
+    echo "  BOUNDARY_CONDITION:   $boundary_condition"
+    echo "  ENTRAINMENT_METHOD:   $entrainment_method"
+    echo "  ENTRAINMENT_U_FACTOR: $entrainment_u_factor"
+    echo "  ENTRAINMENT_A_FACTOR: $entrainment_a_factor"
+    echo "  N_CORRECTORS:         $n_correctors"
+    echo "  N_NORTHO_CORRECTORS:  $n_northo_correctors"
+    echo "================================================================="
+  } | tee "$LOG_FILE"
+}
 
 set_dsl_dir() {
   DSL_DIR=$1
@@ -355,20 +399,31 @@ notify() {
 #	  $1 - simulation path                                                       #
 ################################################################################
 run_sim() {
-  $PSA_ANIM_SCRIPTS/monitor_sim.sh -i $1 $2 &
+  $PSA_ANIM_SCRIPTS/monitor_sim.sh -i $2 $3 &
   ID=$!
-  cd "$1" || exit
+  cd "$2" || exit
   chmod 777 Allclean
   chmod 777 Allrun-parallel
   chmod 777 Allrun
   echo "launch monitor with pid $ID"
+  if [[ ! -d "$OUTPUT_DIR/$1/frames" ]]; then
+    echo "creating directory: $OUTPUT_DIR/$1/frames"
+    mkdir -p $OUTPUT_DIR/$1/frames
+  fi
   if [ $RUN_PARALLEL -eq 1 ]; then
     ./Allrun-parallel
+    kill $ID
+    if [[ "$1" == "psl" ]]; then
+      $PSA_ANIM_SCRIPTS/reconstruct_par.sh -o $OUTPUT_DIR/$1/frames -e $duration --step $reconstruct_step --clean
+    else
+      $PSA_ANIM_SCRIPTS/reconstruct_par.sh -o $OUTPUT_DIR/$1/frames -e $duration --step $write_time --clean -np 8 --batch
+    fi
   else
     ./Allrun
+    kill $ID
+    $PSA_ANIM_SCRIPTS/monitor_sim.sh -i $2 --move-frames
+    mv -r frames/* $OUTPUT_DIR/$1/frames
   fi
-  kill $ID
-  $PSA_ANIM_SCRIPTS/monitor_sim.sh -i $1 --move-frames
   notify "... simulation complete!"
   cd "$WORKING_DIR" || exit
 }
@@ -379,14 +434,14 @@ setup_dsl() {
   if [ $USE_DSL_SIM -eq 0 ]; then
     generator=$1
     if [ -z "$2" ]; then
-      echo "setup_dsl without dem"
       $PYTHON "$TOOLS_DIR"/init_dsl.py            \
         -o "$DSL_DIR"                             \
         --template-dir "$TOOLS_DIR"/assets/dsl    \
         --et "$duration"                          \
         --wt "$write_time"                        \
         --eb $erosion_energy                      \
-        --mesh-generator $generator
+        --mesh-generator $generator               \
+        $verbose
     else
       echo "setup_dsl with dem"
       $PYTHON "$TOOLS_DIR"/init_dsl.py            \
@@ -396,7 +451,8 @@ setup_dsl() {
         --wt "$write_time"                        \
         --eb $erosion_energy                      \
         --mesh-generator $generator               \
-        --dem
+        --dem                                     \
+        $verbose
     fi
   fi
 }
@@ -422,8 +478,11 @@ setup_psl_2d() {
     --u-factor "$entrainment_u_factor"          \
     --a-factor "$entrainment_a_factor"          \
     --f-factor "$entrainment_f_factor"          \
+    --n-correctors "$n_correctors"              \
+    --n-northo-correctors "$n_northo_correctors"\
     --profile                                   \
-    --run-2d
+    --run-2d                                    \
+    $verbose
 }
 ################################################################################
 #	SETUP 3D PSL FUNCTION                                                        #
@@ -449,7 +508,10 @@ setup_psl_3d() {
     --pz $PARALLEL_Z                              \
     --dt $delta_t                                 \
     --wt "$write_time"                            \
-    --et "$duration"                        
+    --et "$duration"                              \
+    --n-correctors "$n_correctors"                \
+    --n-northo-correctors "$n_northo_correctors"  \
+    $verbose
 }
 ################################################################################
 #	PREPARE PSL DATA FUNCTION                                                    #
@@ -463,10 +525,11 @@ dsl_to_psl()
   # prepare psl input data
   $PYTHON "$TOOLS_DIR"/dsl2psl.py       \
     -i "$DSL_DIR"                       \
-    -f "$DSL_DIR"                       \
+    -f "$OUTPUT_DIR/dsl/"               \
     -o "$PSL_DIR"/constant/boundaryData \
     -p terrain                          \
-    -op terrain
+    -op terrain                         \
+    $verbose
 }
 ################################################################################
 #	WRITE DSL INPUT                                                              #
@@ -535,51 +598,62 @@ render_sim()
     $PYTHON "$TOOLS_DIR"/foam2obj.py                \
       -i "$psl_sim_dir"                             \
       -p terrain                                    \
-      -o "$terrain_output_dir"
+      -o "$terrain_output_dir"                      \
+      $verbose
   
     # export terrain base
     $PYTHON "$TOOLS_DIR"/terrain_base.py            \
       -i "$terrain_output_dir"/terrain.obj          \
-      -o "$terrain_output_dir"/terrain_base.obj
-  
-    $PYTHON "$TOOLS_DIR"/dsl_surface.py \
-      -i $dsl_sim_dir \
-      -p terrain \
-      -o "$dsl_output_dir" \
-      --only-missing-frames \
-      --with-height-map \
-      --renumber-frames
-      #--with-distance-map \
+      -o "$terrain_output_dir"/terrain_base.obj     \
+      $verbose
+ 
+    if [ $RUN_DSL -eq 1 ]; then
+      $PYTHON "$TOOLS_DIR"/dsl_surface.py \
+        -i $dsl_sim_dir \
+        -s $OUTPUT_DIR/dsl \
+        -p terrain \
+        -o "$dsl_output_dir" \
+        --only-missing-frames \
+        --with-height-map \
+        --renumber-frames \
+        $verbose
+        #--with-distance-map \
+    fi
 
     # convert psl output into openvdb volumes
     [ ! -d "$vdb_output_dir" ] && mkdir "$vdb_output_dir"
 
-
-    if [ $RUN_2D -eq 1 ]; then
-      $FOAM2VDB -i "$psl_sim_dir"                            \
-        -o "$vdb_output_dir"                                 \
-        -s 0.5                                               \
-        --only-missing-frames                                \
-        --renumber-frames                                    \
-        --interpolation cell                                 \
-        --color-by density                                   \
-        --only-cells                                         \
-        --ptu-size 10                                        \
-        --every-n 1                                        
-        #--min 0.0001 \
-        #--iso 0.0001 \
-        # -2d  \
-    else
-      $FOAM2VDB -i "$psl_sim_dir"                            \
-        -o "$vdb_output_dir"                                 \
-        -s 1.0                                               \
-        --only-missing-frames                                \
-        --renumber-frames                                    \
-        --interpolation hrbf                                 \
-        --ptu-size 10                                        \
-        --every-n 1                                        
-        #--use-ptu                                            \
-        #-f 600
+    if [ $RUN_PSL -eq 1 ]; then
+      if [ $RUN_2D -eq 1 ]; then
+        $FOAM2VDB -i "$psl_sim_dir"                            \
+          -o "$vdb_output_dir"                                 \
+          --frames-dir $OUTPUT_DIR/psl                         \
+          -s 0.5                                               \
+          --only-missing-frames                                \
+          --renumber-frames                                    \
+          --interpolation cell                                 \
+          --color-by density                                   \
+          --only-cells                                         \
+          --ptu-size 10                                        \
+          --every-n 1                                          \
+          $verbose
+          #--min 0.0001 \
+          #--iso 0.0001 \
+          # -2d  \
+      else
+        $FOAM2VDB -i "$psl_sim_dir"                            \
+          -o "$vdb_output_dir"                                 \
+          --frames-dir $OUTPUT_DIR/psl                         \
+          -s 1.0                                               \
+          --only-missing-frames                                \
+          --renumber-frames                                    \
+          --interpolation hrbf                                 \
+          --ptu-size 10                                        \
+          --every-n 1                                          \
+          $verbose
+          #--use-ptu                                            \
+          #-f 600
+      fi
     fi
   
   } #2>&1 | tee "$RENDER_LOG_FILE"
@@ -587,6 +661,7 @@ render_sim()
 
 ########################################################################### run
 
+export -f log_parameters
 export -f set_dsl_dir
 export -f set_psl_dir
 export -f setup_dsl

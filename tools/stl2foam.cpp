@@ -46,7 +46,13 @@ int main(int argc, const char **argv) {
   parser.addArgument("--inclined-top", "top follows terrain inclination");
   parser.addArgument("--height", "extrusion height");
   parser.addArgument("--align-faces", "generate an x-aligned mesh");
+  parser.addArgument("--verbose");
   HERMES_ASSERT(parser.parse(argc, argv, true));
+
+  if (!parser.check("--verbose")) {
+    hermes::Log::log_callback = [](const hermes::Str &m,
+                                   hermes::logging_options o) {};
+  }
 
   // parameters
   hermes::Path path(parser.get<std::string>("-i"));

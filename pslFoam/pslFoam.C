@@ -219,6 +219,36 @@ int main(int argc, char *argv[]) {
 #include "profile.H"
     }
 
+    // safe profile print
+    FILE *fp =
+        fopen(("current_profile_times_" + std::to_string(Pstream::myProcNo()))
+                  .c_str(),
+              "w+");
+    if (fp != nullptr) {
+#define PRINT_TIME(WATCH)                                                      \
+  fprintf(fp, "%s %lf %d\n", #WATCH, PSA_ANIM_TIME(WATCH),                     \
+          PSA_ANIM_COUNT(WATCH))
+
+      PRINT_TIME(totalTime);
+      PRINT_TIME(initTime);
+      PRINT_TIME(mainLoopTime);
+      PRINT_TIME(mainLoopIterationTime);
+      PRINT_TIME(PIMPLELoopTime);
+      PRINT_TIME(PISOLoopTime);
+      PRINT_TIME(boundaryUpdateTime);
+      PRINT_TIME(alphaUpdateTime);
+      PRINT_TIME(momentumPredictionTime);
+      PRINT_TIME(pressureEquationTime);
+      PRINT_TIME(pressureSetupTime);
+      PRINT_TIME(correctNonOrthogonalLoopTime);
+      PRINT_TIME(correctNonOrthogonalLoopIterationTime);
+      PRINT_TIME(constrainPressureTime);
+      PRINT_TIME(adjustPhiTime);
+      PRINT_TIME(pressureSolveTime);
+
+      fclose(fp);
+    }
+
     runTime.write();
 
     runTime.printExecutionTime(Info);

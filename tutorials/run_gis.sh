@@ -26,8 +26,6 @@
 if [ $TERRAIN_ALIGNED -eq 0 ]; then
   axis_x=$(bc -l <<<"$axis_b_x - $axis_a_x;")
   axis_y=$(bc -l <<<"$axis_b_y - $axis_a_y;")
-  echo "($axis_a_x, $axis_a_y) and ($axis_b_x, $axis_b_y)"
-  echo "($axis_x, $axis_y)"
 
   # normalize axis
   norm=$(bc -l <<<"sqrt($axis_x * $axis_x + $axis_y * $axis_y);")
@@ -56,8 +54,9 @@ setup_psl_mesh() {
   # if the mesh type is block mesh then we need to generate
   if [ "$PSL_MESH_TYPE" = "blockMesh" ]; then
     # prepare block mesh dict
-    r=$(bc -l <<<"($height / $cell_size)/2;")
+    r=$(bc -l <<<"($height / $cell_size);")
     r=${r%.*}
+    echo "Z RESOLUTION $r over $height"
     if [ $TERRAIN_ALIGNED -eq 0 ]; then
       $PYTHON "$TOOLS_DIR"/mesh2quad.py \
         -i "$DSL_DIR"/constant/surface.stl \
@@ -65,17 +64,19 @@ setup_psl_mesh() {
         --axis-a $axis_a_x $axis_a_y \
         --axis-b "$axis_b_x" "$axis_b_y" \
         --width "$DOMAIN_WIDTH" \
-        --cell-size "$cell_size"
+        --cell-size "$cell_size" \
+        $verbose
       $PYTHON "$TOOLS_DIR"/quad2block_mesh_desc.py \
         -i "$PSL_DIR"/constant/surface.obj \
         -o "$PSL_DIR"/system/blockMeshDict \
-        --grading 1 1 4 \
+        --grading 1 1 2 \
         --res 1 1 "$r" \
         --height $height \
         --inclined-top \
         --axis-a $axis_a_x $axis_a_y \
         --axis-b "$axis_b_x" "$axis_b_y" \
-        --domain-type $boundary_condition
+        --domain-type $boundary_condition \
+        $verbose
     else
       # use terrain geometry to align boundaries
       $PYTHON "$TOOLS_DIR"/mesh2quad.py \
@@ -83,6 +84,7 @@ setup_psl_mesh() {
         -o "$PSL_DIR"/constant/surface.obj \
         --terrain-aligned \
         --cell-size "$cell_size" 
+        $verbose 
       $PYTHON "$TOOLS_DIR"/quad2block_mesh_desc.py \
         -i "$PSL_DIR"/constant/surface.obj \
         -o "$PSL_DIR"/system/blockMeshDict \
@@ -90,7 +92,8 @@ setup_psl_mesh() {
         --grading 1 1 3 \
         --res 1 1 "$r" \
         --height $height \
-        --inclined-top 
+        --inclined-top \
+        $verbose
     fi
   else
     if [ $TERRAIN_ALIGNED -eq 0 ]; then
@@ -101,14 +104,16 @@ setup_psl_mesh() {
         --slope-axis-b "$axis_b_x","$axis_b_y" \
         --height $height \
         -i "$DSL_DIR"/constant/surface.stl \
-        -o "$PSL_DIR"/constant/surface.stl
+        -o "$PSL_DIR"/constant/surface.stl \
+        $verbose
     else
       "$C_TOOLS_DIR"/stl2foam \
         -p terrain \
         -i "$DSL_DIR"/constant/surface.stl \
         -o "$PSL_DIR"/constant/surface.stl \
         --height $height \
-        --align-faces
+        --align-faces \
+        $verbose
         # --inclined-top \
     fi
   fi
@@ -129,73 +134,90 @@ run_full() {
     echo "  asset dir: $ASSETS_DIR"
   } | tee "$PSL_LOG_FILE"
 
-  {
-    if [ $USE_DSL_SIM -eq 0 ]; then
-
-      if [[ -f "$ASSETS_DIR"/dem.asc ]]; then
-        setup_dsl pMesh dem
-      else
-        setup_dsl pMesh
-      fi
-  
-      # prepare release data
-      [[ ! -d "$DSL_DIR"/constant/gisdata ]] && mkdir "$DSL_DIR"/constant/gisdata
-
-      if [[ -f ${ASSETS_DIR}/releaseArea ]]; then
-        cp "$ASSETS_DIR"/release.dbf "$DSL_DIR"/constant/gisdata/release.dbf || echo ""
-        cp "$ASSETS_DIR"/release.shp "$DSL_DIR"/constant/gisdata/release.shp || echo ""
-        cp "$ASSETS_DIR"/release.shx "$DSL_DIR"/constant/gisdata/release.shx || echo ""
+  if [ $RUN_DSL -eq 1 ]; then
+    {
+      if [ $USE_DSL_SIM -eq 0 ]; then
         
-        cp "$ASSETS_DIR"/aoi.dbf "$DSL_DIR"/constant/gisdata/aoi.dbf || echo ""  
-        cp "$ASSETS_DIR"/aoi.shp "$DSL_DIR"/constant/gisdata/aoi.shp || echo "" 
-        cp "$ASSETS_DIR"/aoi.shx "$DSL_DIR"/constant/gisdata/aoi.shx || echo ""  
-        cp "$ASSETS_DIR"/dem.asc "$DSL_DIR"/constant/gisdata/dem.asc || echo "" 
-        
-        cp "$ASSETS_DIR"/releaseArea "$DSL_DIR"/constant/releaseArea
-      else
-        dsl_release $ASSETS_DIR
-      fi
-
-        # setup simulation geometry (terrain)
-      if [ -f $ASSETS_DIR/surface.stl ]; then
-        if [ $TERRAIN_ALIGNED -eq 0 ]; then
-          "$C_TOOLS_DIR"/stl2foam \
-            -p terrain \
-            -i "$ASSETS_DIR"/surface.stl \
-            --inclined-top \
-            --height 200 \
-            -o "$DSL_DIR"/constant/surface.stl
+        if [[ -f "$ASSETS_DIR"/dem.asc ]]; then
+          setup_dsl pMesh dem
         else
-          "$C_TOOLS_DIR"/stl2foam \
-            -p terrain \
-            -i "$ASSETS_DIR"/surface.stl \
-            --inclined-top \
-            --height 200 \
-            -o "$DSL_DIR"/constant/surface.stl \
-            --align-faces
+          setup_dsl pMesh
         fi
-      fi
+    
+        [[ ! -d "$DSL_DIR"/constant/gisdata ]] && mkdir "$DSL_DIR"/constant/gisdata
+        
+        if [[ -f "$ASSETS_DIR"/dem.asc ]]; then
+          cp "$ASSETS_DIR"/dem.asc "$DSL_DIR"/constant/gisdata/dem.asc
+        fi
 
-      run_sim "$DSL_DIR"
-    else
-      echo "using DSL simulation data from $DSL_DIR"
-    fi
-  } | tee "$DSL_LOG_FILE"
+        # prepare release data
+        if [[ -f "${ASSETS_DIR}/release.shp" ]]; then
+          cp "$ASSETS_DIR"/release.dbf "$DSL_DIR"/constant/gisdata/release.dbf 
+          cp "$ASSETS_DIR"/release.shp "$DSL_DIR"/constant/gisdata/release.shp 
+          cp "$ASSETS_DIR"/release.shx "$DSL_DIR"/constant/gisdata/release.shx 
+          
+          cp "$ASSETS_DIR"/aoi.dbf "$DSL_DIR"/constant/gisdata/aoi.dbf 
+          cp "$ASSETS_DIR"/aoi.shp "$DSL_DIR"/constant/gisdata/aoi.shp
+          cp "$ASSETS_DIR"/aoi.shx "$DSL_DIR"/constant/gisdata/aoi.shx 
+        fi
+
+
+        if [[ -f ${ASSETS_DIR}/releaseArea ]]; then
+          cp "$ASSETS_DIR"/releaseArea "$DSL_DIR"/constant/releaseArea
+        else
+          dsl_release $ASSETS_DIR
+        fi
+
+        if [[ -f ${ASSETS_DIR}/faMeshDefinition ]]; then
+          cp "$ASSETS_DIR"/faMeshDefinition "$DSL_DIR"/constant/faMesh/faMeshDefinition
+        fi
+
+        if [[ -f ${ASSETS_DIR}/meshDict ]]; then
+          cp "$ASSETS_DIR"/meshDict "$DSL_DIR"/system/meshDict
+        fi
+
+          # setup simulation geometry (terrain)
+        if [ -f $ASSETS_DIR/surface.stl ]; then
+          if [ $TERRAIN_ALIGNED -eq 0 ]; then
+            "$C_TOOLS_DIR"/stl2foam \
+              -p terrain \
+              -i "$ASSETS_DIR"/surface.stl \
+              --inclined-top \
+              --height "$height" \
+              -o "$DSL_DIR"/constant/surface.stl
+          else
+            "$C_TOOLS_DIR"/stl2foam \
+              -p terrain \
+              -i "$ASSETS_DIR"/surface.stl \
+              --inclined-top \
+              --height "$height" \
+              -o "$DSL_DIR"/constant/surface.stl \
+              --align-faces 
+          fi
+        fi
+
+        run_sim dsl "$DSL_DIR"
+      else
+        echo "using DSL simulation data from $DSL_DIR"
+      fi
+    } | tee "$DSL_LOG_FILE"
+  fi
 
   # for the psl, we need to setup the mesh and input data
   {
-    if [ $ONLY_DSL -eq 0 ]; then
+    if [ $RUN_PSL -eq 1 ]; then
       setup_psl_3d $PSL_MESH_TYPE
       # prepare mesh
       setup_psl_mesh
       # prepare psl input data
       dsl_to_psl
 
-      run_sim "$PSL_DIR"
+      run_sim psl "$PSL_DIR" --clean
     fi
 
   } 2>&1 | tee -a "$PSL_LOG_FILE"
 }
 
+log_parameters
 echo "initiating full psl sim..."
 run_full

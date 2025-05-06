@@ -67,6 +67,7 @@ struct Parameters {
   // input/output config
   hermes::Path path;
   hermes::Path output_path;
+  hermes::Path frames_path;
   std::string grid_name;
   int single_frame;
   bool force_write;
@@ -85,6 +86,7 @@ struct Parameters {
   double voxel_size;
   // debug
   bool debug;
+  bool verbose;
   // interpolation
   InterpolationMethod interpolation_method{InterpolationMethod::HRBF};
   // ptu
@@ -110,6 +112,7 @@ struct Parameters {
                              "into a OpenVDB volume animation frames.");
     parser.addArgument("-i", "OpenFOAM simulation path");
     parser.addArgument("-o", "OpenVDB output path");
+    parser.addArgument("--frames-dir");
     parser.addArgument("-n", "vdb grid name [default = density]");
     parser.addArgument("--dt",
                        "Re-number frames based on a given dt [default = 0.05]");
@@ -149,10 +152,12 @@ struct Parameters {
     parser.addArgument("--test-gaussian-a", "test gaussian a");
     parser.addArgument("--test-animate-angle", "test varying mesh angle");
     parser.addArgument("--test-animate-scale", "test varying mesh angle");
+    parser.addArgument("--verbose");
     parser.parse(argc, argv, true);
     // parameters
     path = parser.get<std::string>("-i");
     output_path = parser.get<std::string>("-o");
+    frames_path = parser.get<std::string>("--frames-dir");
     grid_name = parser.get<std::string>("-n", "density");
     single_frame = parser.get<int>("-f", -1);
     force_write = parser.check("-F");
@@ -168,6 +173,7 @@ struct Parameters {
     only_cells = parser.check("--only-cells");
     // debug
     debug = parser.check("--debug");
+    verbose = parser.check("--verbose");
     // conversion
     voxel_size = parser.get<float>("-s", 0.5);
     min_cut = parser.get<float>("--min", 0.001);
@@ -692,7 +698,7 @@ int test() {
 }
 
 int run() {
-  SimPath sim_path(args.path);
+  SimPath sim_path(args.frames_path);
 
   struct FrameData {
     hermes::Path frame;
@@ -707,11 +713,7 @@ int run() {
       continue;
     frame_number++;
 
-    if (frame_number % args.every_n != 0)
-      continue;
-
-    if (args.single_frame > 0 && frame_number != args.single_frame)
-      continue;
+    int renamed_frame_number = frame_number;
 
     auto frame_time = std::stof(frame.name());
     auto frame_name =
@@ -720,17 +722,24 @@ int run() {
       // use the dt to compute the actual frame number
       auto fn = hermes::Str::concat(std::setfill('0'), std::setw(6),
                                     frame_time / args.dt);
-      HERMES_LOG("renaming frame {} to {}", frame_name, fn);
+      renamed_frame_number = std::stoi(fn);
       frame_name = fn;
     } else if (args.renumber_frames_seq) {
+      renamed_frame_number = sequential_frame_number;
       auto fn = hermes::Str::concat(std::setfill('0'), std::setw(6),
                                     sequential_frame_number);
       HERMES_LOG("renaming frame {} to {}", sequential_frame_number, fn);
       frame_name = fn;
     }
 
+    if (renamed_frame_number % args.every_n != 0)
+      continue;
+
+    if (args.single_frame > 0 && renamed_frame_number != args.single_frame)
+      continue;
+
     auto output_frame_path = args.output_path / (frame_name + ".vdb");
-    if (!args.force_write && args.single_frame != frame_number &&
+    if (!args.force_write && args.single_frame != renamed_frame_number &&
         hermes::FileSystem::fileExists(output_frame_path))
       continue;
 
@@ -793,36 +802,13 @@ int main(int argc, const char **argv) {
   hermes::Log::addOptions(hermes::logging_options::abbreviate);
   openvdb::initialize();
 
-  // PUVolume<HRBFVolume>::testBlend();
-  //  return 0;
-
   if (!args.read(argc, argv))
     return -1;
+  if (!args.verbose) {
+    hermes::Log::log_callback = [](hermes::Str s,
+                                   hermes::logging_options options) {};
+  }
   if (args.test)
     return test();
-  /*
-else if (args.test_section) {
-  hermes::Str csv;
-  csv.appendLine("method, put_size, rmse");
-  // args.debug = true;
-  // args.interpolation_method = InterpolationMethod::NEAREST;
-  // csv.appendLine(methodName(args.interpolation_method), ", ",
-  // args.ptu_size,
-  //                ", ", test_section());
-  //  args.interpolation_method = InterpolationMethod::SHEPARD;
-  //  csv.appendLine(methodName(args.interpolation_method), ", ",
-  //  args.ptu_size,
-  //                ", ", test_section());
-  args.interpolation_method = InterpolationMethod::RBF;
-  csv.appendLine(methodName(args.interpolation_method), ", ", args.ptu_size,
-                 ", ", test_section());
-  // args.interpolation_method = InterpolationMethod::HRBF;
-  // csv.appendLine(methodName(args.interpolation_method), ", ",
-  // args.ptu_size,
-  //                ", ", test_section());
-  HERMES_LOG_VARIABLE((args.output_path / "data.csv").fullName());
-  hermes::FileSystem::writeFile(args.output_path / "data.csv", csv.str());
-  return 0;
-}*/
   return run();
 }

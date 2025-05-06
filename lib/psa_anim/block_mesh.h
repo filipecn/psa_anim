@@ -28,6 +28,7 @@
 #ifndef PSA_ANIM_TOOLS_PSA_ANIMPY_BLOCK_MESH_H
 #define PSA_ANIM_TOOLS_PSA_ANIMPY_BLOCK_MESH_H
 
+#include "hermes/logging/logging.h"
 #include <hermes/common/file_system.h>
 #include <hermes/geometry/point.h>
 #include <mesh_utils.h>
@@ -147,6 +148,7 @@ public:
 
     // write blocks
     {
+      u64 cell_count = 0;
       content.appendLine("blocks");
       content.appendLine("(");
       for (size_t i = 0; i < blocks_.size(); ++i) {
@@ -158,7 +160,9 @@ public:
         content.append("simpleGrading (", block.grading.x, " ", block.grading.y,
                        " ", block.grading.z, ")");
         content.appendLine("\t//BLOCK ", i);
+        cell_count += block.resolution.depth;
       }
+      HERMES_LOG_VARIABLE(cell_count);
       content.appendLine(");\n\n");
     }
 

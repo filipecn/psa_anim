@@ -36,6 +36,18 @@ else:
 sys.path.insert(0, psa_anim_py_path)
 import psa_anim_py
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", type=Path, help="simulation directory")
@@ -45,42 +57,44 @@ if __name__ == "__main__":
     parser.add_argument("-f", type=Path, help="frames path")
     parser.add_argument("-j", action="store_true", help="jitter points")
     parser.add_argument("--empty-dsl", action="store_true", help="generate empty dsl")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    verbose = args.verbose
 
     # check paths
     if args.i is None or not os.path.isdir(args.i):
-        print("[dsl2psl] input path not found")
+        ERR("[dsl2psl] input path not found")
         exit(1)
 
     output_path = args.o / args.op
 
     if output_path.exists() and os.listdir(output_path):
-        print("[dsl2psl] output folder not empty")
+        ERR("[dsl2psl] output folder not empty")
         exit(1)
     elif not output_path.exists():
         os.makedirs(output_path)
 
-    print("[dsl2psl] convert dsl data into psl boundary data")
-    print("[dsl2psl] ---------------------------------------")
-    print("[dsl2psl][simulation directory] " + str(args.i))
-    print("[dsl2psl][output directory]     " + str(output_path))
-    print("[dsl2psl][input patch name]     " + str(args.p))
-    print("[dsl2psl][output patch name]    " + str(args.op))
-    print("[dsl2psl][frames path]          " + str(args.f))
-    print("[dsl2psl][jitter points]        " + str(args.j))
-    print("[dsl2psl][generate empty dsl]   " + str(args.empty_dsl))
+    LOG("[dsl2psl] convert dsl data into psl boundary data")
+    LOG("[dsl2psl] ---------------------------------------")
+    LOG("[dsl2psl][simulation directory] " + str(args.i))
+    LOG("[dsl2psl][output directory]     " + str(output_path))
+    LOG("[dsl2psl][input patch name]     " + str(args.p))
+    LOG("[dsl2psl][output patch name]    " + str(args.op))
+    LOG("[dsl2psl][frames path]          " + str(args.f))
+    LOG("[dsl2psl][jitter points]        " + str(args.j))
+    LOG("[dsl2psl][generate empty dsl]   " + str(args.empty_dsl))
 
     # simulation data
-    of_sim = psa_anim_py.OFSim()
+    of_sim = psa_anim_py.OFSim(args.verbose)
     of_sim.setSimPath(str(args.i))
 
     if args.f is not None:
         of_sim.setFramesPath(str(args.f))
 
     # get DSL
-    patch = of_sim.DSL(args.p)
+    patch = of_sim.DSL(args.p, args.verbose)
 
     # produce PSL Input
     patch.preparePSLInput(str(output_path), args.j, args.empty_dsl)
 
-    print("[dsl2psl] ------------------------ complete")
+    LOG("[dsl2psl] ------------------------ complete")

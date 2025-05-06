@@ -18,8 +18,20 @@ else:
 sys.path.insert(0, psa_anim_py_path)
 import psa_anim_py
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
+
 if __name__ == "__main__":
-    print("[dsl_surface] ---------------------------------- start")
+    LOG("[dsl_surface] ---------------------------------- start")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -51,15 +63,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max-height", type=float, help="max allowed height (for coloring)", default=4
     )
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    verbose = args.verbose
 
     # check paths
     if args.i is None or not os.path.isdir(args.i):
-        print("[dsl_surface] Input directory could not be found!")
+        ERR("[dsl_surface] Input directory could not be found!")
         exit()
 
     if args.f is not None and not os.path.isdir(args.f):
-        print("[dsl_surface] Input frames directory could not be found!")
+        ERR("[dsl_surface] Input frames directory could not be found!")
         exit()
 
     # parameters
@@ -71,18 +85,18 @@ if __name__ == "__main__":
     if not output_path.exists():
         os.makedirs(output_path)
 
-    print("[dsl_surface] input:        ", str(input_dir))
-    print("[dsl_surface] output:       ", str(output_path))
-    print("[dsl_surface] frames dir:   ", str(frames_dir))
-    print("[dsl_surface] single frame: ", str(single_frame))
+    LOG("[dsl_surface] input:        ", str(input_dir))
+    LOG("[dsl_surface] output:       ", str(output_path))
+    LOG("[dsl_surface] frames dir:   ", str(frames_dir))
+    LOG("[dsl_surface] single frame: ", str(single_frame))
 
     # simulation data
-    of_sim = psa_anim_py.OFSim()
+    of_sim = psa_anim_py.OFSim(args.verbose)
     of_sim.setSimPath(str(input_dir))
     of_sim.setFramesPath(str(frames_dir))
 
     # get DSL
-    patch = of_sim.DSL(args.p)
+    patch = of_sim.DSL(args.p, args.verbose)
 
     # gen surface
     patch.extractSurface(
@@ -96,4 +110,4 @@ if __name__ == "__main__":
         single_frame,
     )
 
-    print("[dsl_surface] ---------------------------------- end")
+    LOG("[dsl_surface] ---------------------------------- end")

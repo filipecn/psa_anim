@@ -16,8 +16,8 @@ runParallel releaseAreaMapping
 
 runParallel $(getApplication)
 
-if [ ! -f log.reconstructPar ]; then
-	runApplication reconstructPar
-fi
+#if [ ! -f log.reconstructPar ]; then
+#	runApplication reconstructPar
+#fi
 
 #------------------------------------------------------------------------------

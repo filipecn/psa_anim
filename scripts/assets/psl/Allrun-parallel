@@ -14,9 +14,6 @@ mpirun -np 20 redistributePar -decompose -parallel
 
 runParallel $(getApplication)
 
-mpirun -np 20 redistributePar -reconstruct -parallel
+# mpirun -np 20 redistributePar -reconstruct -parallel
 
-#if [ ! -f log.reconstructPar ]; then
-#	runApplication reconstructPar
-#fi
 #------------------------------------------------------------------------------

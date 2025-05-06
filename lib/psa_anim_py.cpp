@@ -56,15 +56,20 @@ void printCallback(const hermes::Str &m) {
   std::cout << std::flush;
 }
 
-void initHermes() {
+void initHermes(bool verbose = false) {
   std::cout << std::unitbuf;
   hermes::Log::addOptions(hermes::logging_options::abbreviate);
   hermes::Log::info_callback = printCallback;
-  hermes::Log::log_callback = [](const hermes::Str &m,
-                                 hermes::logging_options o) {
-    py::print(m.str());
-    std::cout << std::flush;
-  };
+  if (verbose) {
+    hermes::Log::log_callback = [](const hermes::Str &m,
+                                   hermes::logging_options o) {
+      py::print(m.str());
+      std::cout << std::flush;
+    };
+  } else {
+    hermes::Log::log_callback = [](const hermes::Str &m,
+                                   hermes::logging_options o) {};
+  }
 }
 
 struct PSLDebugData {
@@ -90,8 +95,8 @@ struct PSLDebugData {
 /// \param width
 void stl2quad(const std::string &stl_path, const std::string &obj_path,
               const py::array_t<float> &a, const py::array_t<float> &b,
-              float cell_size, float width, bool twoDim) {
-  initHermes();
+              float cell_size, float width, bool twoDim, bool verbose = false) {
+  initHermes(verbose);
   HERMES_LOG_VARIABLE(stl_path);
   HERMES_LOG_VARIABLE(obj_path);
   auto n = a.unchecked<1>();
@@ -117,8 +122,9 @@ void stl2quad(const std::string &stl_path, const std::string &obj_path,
 /// \param bottom_type 0 - XY plane, 1 - inclined, 2 - extrusion
 /// \param close_top
 void terrainBase(const std::string &input, const std::string &output,
-                 float deep_height, int bottom_type, bool close_top) {
-  initHermes();
+                 float deep_height, int bottom_type, bool close_top,
+                 bool verbose = false) {
+  initHermes(verbose);
   HERMES_LOG("Creating terrain base parameters");
   HERMES_LOG("==================================================");
   HERMES_LOG_VARIABLE(input);
@@ -239,7 +245,7 @@ public:
   //                                                                                                     CONSTRUCTORS
   // *******************************************************************************************************************
   ///
-  BlockMeshTerrain_py() { initHermes(); }
+  BlockMeshTerrain_py(bool verbose = false) { initHermes(verbose); }
   // *******************************************************************************************************************
   //                                                                                                          METHODS
   // *******************************************************************************************************************
@@ -375,14 +381,15 @@ public:
   //                                                                                                     CONSTRUCTORS
   // *******************************************************************************************************************
   ///
-  DSL_py() { initHermes(); }
+  DSL_py(bool verbose = false) { initHermes(verbose); }
   ///
   /// \param poly_mesh openfoam mesh object
   /// \param patch_id openfoam mesh patch identified
   /// \param sim_path directory containing the DSL simulation steps
   DSL_py(const PolyMesh *poly_mesh, const std::string &patch_name,
-         const SimPath &sim_path)
+         const SimPath &sim_path, bool verbose = false)
       : sim_path_(sim_path) {
+    initHermes(verbose);
     dsl_mesh_.set(poly_mesh, patch_name);
   }
   // *******************************************************************************************************************
@@ -752,14 +759,14 @@ public:
   // *******************************************************************************************************************
   ///
   ///
-  ProceduralDSL_py() { initHermes(); }
+  ProceduralDSL_py(bool verbose = false) { initHermes(verbose); }
   ///
   /// \param poly_mesh openfoam mesh object
   /// \param patch_id openfoam mesh patch identified
   /// \param sim_path directory containing the DSL simulation steps
   ProceduralDSL_py(const PolyMesh *poly_mesh, const std::string &patch_name,
-                   const SimPath &sim_path)
-      : DSL_py(poly_mesh, patch_name, sim_path) {}
+                   const SimPath &sim_path, bool verbose = false)
+      : DSL_py(poly_mesh, patch_name, sim_path, verbose) {}
   // *******************************************************************************************************************
   //                                                                                                          METHODS
   // *******************************************************************************************************************
@@ -929,7 +936,7 @@ public:
   //                                                                                                     CONSTRUCTORS
   // *******************************************************************************************************************
   ///
-  OF_py() { initHermes(); }
+  OF_py(bool verbose = false) { initHermes(verbose); }
   /// Sets the simulation directory containing the mesh geometry in a
   /// constant/polyMesh sub-directory \param sim_path simulation directory path
   /// \return true if data is successfully loaded
@@ -1003,12 +1010,13 @@ public:
   // *******************************************************************************************************************
   //                                                                                                          PATCHES
   // *******************************************************************************************************************
-  [[nodiscard]] ProceduralDSL_py
-  proceduralDSL(const std::string &patch_name) const {
-    return ProceduralDSL_py(&mesh_, patch_name, sim_path_);
+  [[nodiscard]] ProceduralDSL_py proceduralDSL(const std::string &patch_name,
+                                               bool verbose = false) const {
+    return ProceduralDSL_py(&mesh_, patch_name, sim_path_, verbose);
   }
-  [[nodiscard]] DSL_py DSL(const std::string &patch_name) const {
-    return DSL_py(&mesh_, patch_name, sim_path_);
+  [[nodiscard]] DSL_py DSL(const std::string &patch_name,
+                           bool verbose = false) const {
+    return DSL_py(&mesh_, patch_name, sim_path_, verbose);
   }
   /// Exports patch geometry to OBJ format
   /// \param patch_name patch identifier
@@ -1182,7 +1190,7 @@ public:
   // *******************************************************************************************************************
   //                                                                                                     CONSTRUCTORS
   // *******************************************************************************************************************
-  PolyMesh_py() { initHermes(); }
+  PolyMesh_py(bool verbose = false) { initHermes(verbose); }
   //                                                                                                       assignment
   // *******************************************************************************************************************
   //                                                                                                        OPERATORS
@@ -1224,7 +1232,8 @@ PYBIND11_MODULE(psa_anim_py, m) {
   m.def("terrain_base", &terrainBase);
 
   py::class_<BlockMeshTerrain_py>(m, "BlockMeshDesc")
-      .def(py::init([]() { return new BlockMeshTerrain_py(); }))
+      .def(py::init(
+          [](bool verbose) { return new BlockMeshTerrain_py(verbose); }))
       .def("addPatchDirection", &BlockMeshTerrain_py::addPatchDirection,
            "define patch normal direction")
       .def("setBoundaryType", &BlockMeshTerrain_py::setBoundaryType,
@@ -1247,7 +1256,7 @@ PYBIND11_MODULE(psa_anim_py, m) {
       .def("save", &BlockMeshTerrain_py::save, "exports BlockMeshDict");
 
   py::class_<PolyMesh_py>(m, "OFPolyMesh")
-      .def(py::init([]() { return new PolyMesh_py(); }))
+      .def(py::init([](bool verbose) { return new PolyMesh_py(verbose); }))
       .def("loadFile", &PolyMesh_py::load, "load poly mesh from file (.msh)");
 
   py::class_<PSLDebugData>(m, "PSLDebugData")
@@ -1264,6 +1273,7 @@ PYBIND11_MODULE(psa_anim_py, m) {
       .def_readonly("slope_angle", &PSLDebugData::slope_angle);
 
   py::class_<DSL_py>(m, "DSL")
+      .def(py::init([](bool verbose) { return new DSL_py(verbose); }))
       .def("patchName", &DSL_py::patchName, "patch name")
       .def("size", &DSL_py::size, "face count")
       .def("preparePSLInput", &DSL_py::preparePSLInput, "write PSL input")
@@ -1271,6 +1281,7 @@ PYBIND11_MODULE(psa_anim_py, m) {
            "extract polygonal surface mesh");
 
   py::class_<ProceduralDSL_py>(m, "ProceduralDSL")
+      .def(py::init([](bool verbose) { return new ProceduralDSL_py(verbose); }))
       .def("patchName", &ProceduralDSL_py::patchName, "patch name")
       .def("size", &ProceduralDSL_py::size, "face count")
       .def("setDuration", &ProceduralDSL_py::setDuration, "total duration time")
@@ -1291,7 +1302,7 @@ PYBIND11_MODULE(psa_anim_py, m) {
       .def_readonly("size", &PolyMesh::Patch::size);
 
   py::class_<OF_py>(m, "OFSim")
-      .def(py::init([]() { return new OF_py(); }))
+      .def(py::init([](bool verbose) { return new OF_py(verbose); }))
       .def("setSimPath", &OF_py::setSimPath, "open sim folder")
       .def("setFramesPath", &OF_py::setFramesPath, "open sim franes folder")
       .def("setCurrentFrame", &OF_py::setCurrentFrame, "set frame")

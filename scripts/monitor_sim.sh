@@ -6,6 +6,7 @@ SIM_DIR=$WORKING_DIR
 CLEAN=0
 MOVE_FRAMES=0
 CLEAN_FRAMES=0
+VERBOSE=0
 
 usage() {
   echo "usage: monitor_sim [[-i sim-path] | [-h]]"
@@ -22,6 +23,9 @@ while [ "$1" != "" ]; do
     ;;
   --no-clean)
     CLEAN=0
+    ;;
+  --verbose)
+    VERBOSE=1
     ;;
   --move-frames)
     MOVE_FRAMES=1
@@ -130,7 +134,9 @@ clean_dir() {
           for rem in ${remove_list[@]}; do
             file=${times[$i]}/${rem}
             if [[ -f $file ]]; then
-              echo "rm $1 / $(du -h $file)"
+              if [[ $VERBOSE -eq 1 ]]; then
+                echo "rm $1 / $(du -h $file)"
+              fi
               rm -r $file
             fi
           done
@@ -158,8 +164,10 @@ clean_par() {
         if (( $i < $last_i )); then
           for f in "${folders[@]}"; do
             if [ -d $f/${times[$i]} ]; then
-              echo "remove $f/${times[$i]}"
-              # rm -r  $f/${times[$i]}
+              if [[ $VERBOSE -eq 1 ]]; then
+                echo "remove $f/${times[$i]}"
+                # rm -r  $f/${times[$i]}
+              fi
             fi
           done
         fi
@@ -190,7 +198,9 @@ move_frames() {
     array_size=${#times[@]}
     if (( $array_size > 0 )); then
       for i in "${!times[@]}"; do
-        echo "storing frame " ${times[$i]}
+        if [[ $VERBOSE -eq 1 ]]; then
+          echo "storing frame " ${times[$i]}
+        fi
         mv ${times[$i]} frames/${times[$i]}
       done
     fi
@@ -216,7 +226,9 @@ remove_par_frames() {
           if (( $i < $last_i )); then
             if [[ "${times[$i]}" != "0" ]]; then
               rm -r ${times[$i]}
-              echo "remove $f/${times[$i]}"
+              if [[ $VERBOSE -eq 1 ]]; then
+                echo "remove $f/${times[$i]}"
+              fi
             fi
           fi
         done

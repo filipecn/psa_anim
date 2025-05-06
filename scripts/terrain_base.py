@@ -18,8 +18,19 @@ else:
 sys.path.insert(0, psa_anim_py_path)
 import psa_anim_py
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
+
 if __name__ == "__main__":
-    print("[terrain_base] Starting terrain_base --------------------------")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", type=Path, help="mesh file", required=True)
@@ -29,14 +40,18 @@ if __name__ == "__main__":
         "--bottom-type", type=str, help="[xy | inclined | extrude]", default="xy"
     )
     parser.add_argument("--close-top", action="store_true", help="include input mesh")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    verbose = args.verbose
+
+    LOG("[terrain_base] Starting terrain_base --------------------------")
 
     if not os.path.exists(args.i):
-        print("[terrain_base] Invalid file path")
+        ERR("[terrain_base] Invalid file path")
         exit(1)
 
     if os.path.exists(args.o):
-        print("[terrain_base] Output file exists")
+        ERR("[terrain_base] Output file exists")
         exit(1)
 
     if args.bottom_type == "xy":
@@ -46,17 +61,22 @@ if __name__ == "__main__":
     elif args.bottom_type == "extrude":
         bottom_type = 2
     else:
-        print("[terrain_base] Invalid bottom type option")
+        ERR("[terrain_base] Invalid bottom type option")
         exit(1)
 
-    print("[terrain_base] input:       ", str(args.i))
-    print("[terrain_base] output:      ", str(args.o))
-    print("[terrain_base] base height: ", args.base_height)
-    print("[terrain_base] bottom type: ", args.bottom_type)
-    print("[terrain_base] close top:   ", args.close_top)
+    LOG("[terrain_base] input:       ", str(args.i))
+    LOG("[terrain_base] output:      ", str(args.o))
+    LOG("[terrain_base] base height: ", args.base_height)
+    LOG("[terrain_base] bottom type: ", args.bottom_type)
+    LOG("[terrain_base] close top:   ", args.close_top)
 
     psa_anim_py.terrain_base(
-        str(args.i), str(args.o), args.base_height, bottom_type, args.close_top
+        str(args.i),
+        str(args.o),
+        args.base_height,
+        bottom_type,
+        args.close_top,
+        args.verbose,
     )
 
-    print("[terrain_base] ------------------------ complete")
+    LOG("[terrain_base] ------------------------ complete")

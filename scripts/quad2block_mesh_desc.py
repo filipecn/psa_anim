@@ -18,6 +18,17 @@ else:
 sys.path.insert(0, psa_anim_py_path)
 import psa_anim_py
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
 
 class Vec:
     def __init__(self, x, y):
@@ -57,28 +68,30 @@ if __name__ == "__main__":
     )
     parser.add_argument("--d2", action="store_true")
     parser.add_argument("--domain-type", type=str, help="openBox", default="openBox")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    verbose = args.verbose
 
     # check paths
     if args.i is None or not os.path.isfile(args.i):
-        print("[quad2block_mesh_desc] Invalid obj file")
+        ERR("[quad2block_mesh_desc] Invalid obj file")
         exit(1)
 
     if args.o.exists():
-        print("[quad2block_mesh_desc] Output file not empty")
+        ERR("[quad2block_mesh_desc] Output file not empty")
         exit(1)
 
-    print("[quad2block_mesh_desc] Starting quad2block_mesh_desc -------------")
-    print("[quad2block_mesh_desc] input:         ", str(args.i))
-    print("[quad2block_mesh_desc] outout:        ", str(args.o))
-    print("[quad2block_mesh_desc] grading:       ", args.grading)
-    print("[quad2block_mesh_desc] res:           ", args.res)
-    print("[quad2block_mesh_desc] inclined-top:  ", args.inclined_top)
-    print("[quad2block_mesh_desc] height:        ", args.height)
-    print("[quad2block_mesh_desc] axis-a:        ", args.axis_a)
-    print("[quad2block_mesh_desc] axis-b:        ", args.axis_b)
-    print("[quad2block_mesh_desc] domain-type:   ", args.domain_type)
-    print("[quad2block_mesh_desc] d2:            ", args.d2)
+    LOG("[quad2block_mesh_desc] Starting quad2block_mesh_desc -------------")
+    LOG("[quad2block_mesh_desc] input:         ", str(args.i))
+    LOG("[quad2block_mesh_desc] outout:        ", str(args.o))
+    LOG("[quad2block_mesh_desc] grading:       ", args.grading)
+    LOG("[quad2block_mesh_desc] res:           ", args.res)
+    LOG("[quad2block_mesh_desc] inclined-top:  ", args.inclined_top)
+    LOG("[quad2block_mesh_desc] height:        ", args.height)
+    LOG("[quad2block_mesh_desc] axis-a:        ", args.axis_a)
+    LOG("[quad2block_mesh_desc] axis-b:        ", args.axis_b)
+    LOG("[quad2block_mesh_desc] domain-type:   ", args.domain_type)
+    LOG("[quad2block_mesh_desc] d2:            ", args.d2)
 
     output_path = args.o
 
@@ -87,7 +100,7 @@ if __name__ == "__main__":
     x_ = (b - a).normalized()
     y_ = x_.right()
 
-    bm = psa_anim_py.BlockMeshDesc()
+    bm = psa_anim_py.BlockMeshDesc(args.verbose)
 
     bm.addPatchDirection("top", [0, 0, 1])
     bm.addPatchDirection("terrain", [0, 0, -1])
@@ -127,4 +140,4 @@ if __name__ == "__main__":
     bm.loadOBJ(str(args.i))
     bm.save(str(args.o))
 
-    print("[quad2block_mesh_desc] ------------------------ complete")
+    LOG("[quad2block_mesh_desc] ------------------------ complete")

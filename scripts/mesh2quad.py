@@ -17,12 +17,23 @@ else:
 sys.path.insert(0, psa_anim_py_path)
 import psa_anim_py
 
+verbose = False
+
+
+def LOG(*args):
+    if verbose:
+        print(args)
+
+
+def ERR(*args):
+    print(args)
+
 
 def compute_axis(stl_file):
     x_bounds = [0, 0]
     y_bounds = [0, 0]
     first = True
-    print(stl_file)
+    LOG(stl_file)
     with open(stl_file, "r") as stl:
         lines = stl.readlines()
         for line in lines:
@@ -32,7 +43,7 @@ def compute_axis(stl_file):
                 y = float(words[2])
                 if first:
                     first = False
-                    print(x, y, line)
+                    LOG(x, y, line)
                 x_bounds[0] = min([x, x_bounds[0]])
                 x_bounds[1] = max([x, x_bounds[1]])
                 y_bounds[0] = min([y, y_bounds[0]])
@@ -47,8 +58,6 @@ def compute_axis(stl_file):
 
 
 if __name__ == "__main__":
-    print("[mesh2quad] Starting mesh2quad --------------------------")
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", type=Path, help=".stl file", required=True)
     parser.add_argument("-o", type=Path, help="output obj", required=True)
@@ -63,18 +72,22 @@ if __name__ == "__main__":
         "--terrain-aligned", action="store_true", help="descend is x ligned"
     )
     parser.add_argument("--d2", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    verbose = args.verbose
+
+    LOG("[mesh2quad] Starting mesh2quad --------------------------")
 
     if not os.path.exists(args.i):
-        print("[mesh2quad] Invalid stl file path")
-        print("[mesh2quad][stl file] " + str(args.i))
+        ERR("[mesh2quad] Invalid stl file path")
+        ERR("[mesh2quad][stl file] " + str(args.i))
         exit(1)
 
     if os.path.exists(args.o):
-        print("[mesh2quad] Output file exists")
+        LOG("[mesh2quad] Output file exists")
 
-    print("[mesh2quad] input:       ", args.i)
-    print("[mesh2quad] output:      ", args.o)
+    LOG("[mesh2quad] input:       ", args.i)
+    LOG("[mesh2quad] output:      ", args.o)
 
     if args.terrain_aligned:
         bounds = compute_axis(args.i)
@@ -86,12 +99,19 @@ if __name__ == "__main__":
         axis_b = args.axis_b
         width = args.width
 
-    print("[mesh2quad] axis points: ", axis_a, axis_b)
-    print("[mesh2quad] cell size:   ", args.cell_size)
-    print("[mesh2quad] width:       ", width, flush=True)
+    LOG("[mesh2quad] axis points: ", axis_a, axis_b)
+    LOG("[mesh2quad] cell size:   ", args.cell_size)
+    LOG("[mesh2quad] width:       ", width)
 
     psa_anim_py.convert_to_quad_mesh(
-        str(args.i), str(args.o), axis_a, axis_b, args.cell_size, width, args.d2
+        str(args.i),
+        str(args.o),
+        axis_a,
+        axis_b,
+        args.cell_size,
+        width,
+        args.d2,
+        args.verbose,
     )
 
-    print("[mesh2quad] ------------------------ complete")
+    LOG("[mesh2quad] ------------------------ complete")

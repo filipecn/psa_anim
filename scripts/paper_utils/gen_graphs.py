@@ -200,6 +200,8 @@ if __name__ == "__main__":
         data["name"] = name
         df_front = pd.concat([df_front, data.head(args.max_frames)], axis=0)
 
+    df_stats["total_volume"] = df_stats["total_mass"] / 1.4
+
     sns.set_context(
         "paper", rc={"font.size": 12, "axes.titlesize": 12, "axes.labelsize": 12}
     )
@@ -211,6 +213,14 @@ if __name__ == "__main__":
         ax, "upper center", bbox_to_anchor=(0.25, 0.95), title=None, frameon=True
     )
     plt.savefig("total_mass.png")
+
+    ax = sns.relplot(data=df_stats, kind="line", x="time", y="total_volume", hue="name")
+    ax.set(ylabel="Total Volume [m3]", xlabel="Time [s]", title="")
+    plt.title("Total Volume", y=0.95)
+    sns.move_legend(
+        ax, "upper center", bbox_to_anchor=(0.25, 0.95), title=None, frameon=True
+    )
+    plt.savefig("total_volume.pdf")
 
     ax = sns.relplot(
         data=df_stats, kind="line", x="time", y="dsl_total_mass", hue="name"
