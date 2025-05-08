@@ -1,1 +1,0 @@
-../friction/kt/kt.C

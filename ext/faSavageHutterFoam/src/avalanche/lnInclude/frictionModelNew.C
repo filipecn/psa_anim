@@ -1,1 +1,0 @@
-../friction/frictionModel/frictionModelNew.C

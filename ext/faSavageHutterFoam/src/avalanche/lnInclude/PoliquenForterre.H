@@ -1,1 +1,0 @@
-../friction/PoliquenForterre/PoliquenForterre.H

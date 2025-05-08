@@ -1,8 +1,0 @@
-// terrain patch
-pslTerrainPatchName terrain;
-// profile
-pslProfile 0;
-pslProfileFile mass_injection;    // store mass, maxU per frame
-// entrainment method
-pslEntrainmentMethod 0;           // entrainament method 0 or 1
-pslSnowCoverDensity 25;           // snow cover density [kg / m3]

@@ -1,1 +1,0 @@
-../friction/laminarSuspension/laminarSuspension.C
