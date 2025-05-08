@@ -1,6 +1,7 @@
 build
-pslFoam/Make/linux*
 .cache
+*linux*
+
 # Prerequisites
 *.d
 

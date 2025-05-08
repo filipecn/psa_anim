@@ -3,8 +3,7 @@ include(FetchContent)
 FetchContent_Declare(
   hermes
   GIT_REPOSITORY https://github.com/filipecn/hermes.git
-  GIT_TAG main
-  #GIT_TAG "v.1.0.0-beta"
+  GIT_TAG "v1.0.0"
 )
 
 FetchContent_MakeAvailable(hermes)
