@@ -11,12 +11,12 @@ https://flickity.metafizzy.co
 .flickity-viewport {
   overflow: hidden;
   position: relative;
-  height: 50%;
+  height: 30%;
 }
 
 .flickity-slider {
   position: absolute;
-  width: 100%;
+  width: 50%;
   height: 100%;
 }
 
