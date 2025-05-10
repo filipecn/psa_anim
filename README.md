@@ -4,7 +4,7 @@
 
 <h2>ACM Transactions on Graphics - SIGGRAPH 2025</h2>
 
-[Filipe Nascimento](https://filipecn.dev/), [Fabricio S. Souza](https://sites.google.com/icmc.usp.br/fssousa/home), [Afonso Paiva](https://sites.google.com/icmc.usp.br/apneto/)
+[Filipe Nascimento](https://filipecn.dev/), [Fabricio S. Sousa](https://sites.google.com/icmc.usp.br/fssousa/home), [Afonso Paiva](https://sites.google.com/icmc.usp.br/apneto/)
 
 University of Sao Paulo - (ICMC-USP)
 
