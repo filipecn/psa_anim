@@ -9,7 +9,7 @@
 University of Sao Paulo - (ICMC-USP)
 
 
-### [Projectpage](https://filipecn.github.io/psa_anim/) · [Paper](https://filipecn.github.io/psa_anim/static/pdf/psa_anim.pdf) · [Video](https://www.youtube.com/watch?v=rHvtYA-lLIk&feature=youtu.be)
+### [Project Page](https://filipecn.github.io/psa_anim/) · [Paper](https://filipecn.github.io/psa_anim/static/pdf/psa_anim.pdf) · [Video](https://www.youtube.com/watch?v=rHvtYA-lLIk&feature=youtu.be)
 
 </div>
 
@@ -91,4 +91,16 @@ Please check the documentation for more details.
 
 ## Citation
 
-TODO
+```
+@article{Nascimento:TOG:2025,
+	author = {Nascimento, Filipe and Sousa, Fabricio S. and Paiva, Afonso},
+	title = {Digital Animation of Powder-Snow Avalanches},
+	year = {2025},
+	volume = {44},
+	number = {4},
+	doi = {10.1145/3730862},
+	journal = {ACM Trans. Graph.},
+	articleno = {},
+	numpages = {20}
+}
+```
